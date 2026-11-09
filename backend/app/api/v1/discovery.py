@@ -84,3 +84,4 @@ def cancel_discovery_run(
             detail="Could not cancel run (either not found or not currently running).",
         )
     return {"status": "cancelled", "run_id": run_id}
+

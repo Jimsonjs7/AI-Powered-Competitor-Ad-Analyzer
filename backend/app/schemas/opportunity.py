@@ -42,3 +42,4 @@ class OpportunityDraftResponse(BaseModel):
     used_claims: List[str]
     missing_claims: List[str]
     compliance_note: str
+

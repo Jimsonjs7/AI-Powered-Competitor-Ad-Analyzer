@@ -17,3 +17,4 @@ class DiscoveryRun(Base):
     cost_usd = Column(Float, default=0.0)
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     finished_at = Column(DateTime, nullable=True)
+

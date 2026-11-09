@@ -21,3 +21,4 @@ class EvidenceItem(Base):
 
     competitor = relationship("Competitor")
     ad = relationship("Ad")
+

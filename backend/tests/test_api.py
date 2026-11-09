@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.database import SessionLocal
+from tests.conftest import TestingSessionLocal as SessionLocal
 from app.models.competitor import Competitor
 from app.models.ad import Ad
 from app.core.security import validate_target_url

@@ -24,3 +24,4 @@ class DiscoveryStatusResponse(BaseModel):
     cost_usd: float = 0.0
     started_at: datetime
     finished_at: Optional[datetime] = None
+

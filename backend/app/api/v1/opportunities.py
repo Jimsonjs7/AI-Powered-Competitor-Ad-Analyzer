@@ -28,3 +28,4 @@ def draft_opportunity_counter_ad(
         return service.generate_draft(payload.opportunity_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+

@@ -160,3 +160,4 @@ class DiscoveryService:
                 db.commit()
         finally:
             db.close()
+

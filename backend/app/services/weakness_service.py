@@ -221,3 +221,4 @@ class WeaknessService:
             is_sufficient=sufficiency.is_sufficient,
             analyzed_at=latest,
         )
+

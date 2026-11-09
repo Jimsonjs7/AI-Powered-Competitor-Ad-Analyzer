@@ -54,3 +54,4 @@ def get_competitor_evidence(
 
     service = EvidenceService(db)
     return service.get_evidence_for_competitor(competitor_id, page=page, page_size=page_size)
+

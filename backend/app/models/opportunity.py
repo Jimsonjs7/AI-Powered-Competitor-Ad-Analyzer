@@ -33,3 +33,4 @@ class Opportunity(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     cluster = relationship("ObjectionCluster", back_populates="opportunities")
+

@@ -1,10 +1,10 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
 from app.schemas.profile import (
     AutofillResponse,
-    BusinessProfileCreate,
     BusinessProfileResponse,
     BusinessProfileUpdate,
     ProfileCompletenessResponse,
@@ -23,13 +23,36 @@ def get_profile(db: Session = DbDependency):
     service = ProfileService(db)
     profile = service.get_active_profile()
     if not profile:
-        # Return default initialized profile for BrandMonk
-        default_create = BusinessProfileCreate(
-            name="BrandMonk Academy",
-            city="Coimbatore",
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        return BusinessProfileResponse(
+            id=0,
+            version=1,
+            name="",
+            description=None,
+            tagline=None,
+            business_type=["training academy"],
             domains=["AI", "Digital marketing", "UI/UX"],
+            city="Coimbatore",
+            area=None,
+            lat=None,
+            lng=None,
+            radius_km=10.0,
+            website=None,
+            tone="Professional and outcome-focused",
+            target_audience=None,
+            price_positioning="mid",
+            languages=["English"],
+            primary_goal="enquiries",
+            monthly_budget_range=None,
+            preferred_cta="Book a free demo",
+            thresholds={"min_ads": 3, "min_reviews": 20, "min_comments": 15},
+            is_active=False,
+            created_at=now,
+            updated_at=now,
+            services=[],
+            claims=[],
+            social_accounts=[],
         )
-        return service.upsert_profile(default_create)
     return service.to_response(profile)
 
 

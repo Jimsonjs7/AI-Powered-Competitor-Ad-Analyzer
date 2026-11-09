@@ -56,3 +56,4 @@ def get_competitor_weaknesses(
 
     service = WeaknessService(db)
     return service.list_weaknesses_for_competitor(competitor_id)
+

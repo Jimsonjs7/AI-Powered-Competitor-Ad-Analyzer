@@ -364,3 +364,4 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
     </div>
   );
 };
+

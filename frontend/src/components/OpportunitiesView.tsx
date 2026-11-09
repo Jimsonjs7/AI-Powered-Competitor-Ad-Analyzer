@@ -217,3 +217,4 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({ onBack }) 
     </div>
   );
 };
+

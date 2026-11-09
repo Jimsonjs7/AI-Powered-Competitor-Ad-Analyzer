@@ -19,3 +19,4 @@ class Weakness(Base):
     computed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     competitor = relationship("Competitor")
+

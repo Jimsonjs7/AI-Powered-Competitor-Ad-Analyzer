@@ -125,3 +125,4 @@ class EvidenceService:
         count = self.db.query(EvidenceItem).filter(EvidenceItem.expires_at < now).delete()
         self.db.commit()
         return count
+

@@ -28,3 +28,4 @@ class EvidenceListResponse(BaseModel):
     items: List[EvidenceItemResponse]
     total: int
     source_breakdown: Dict[str, int]
+

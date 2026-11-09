@@ -32,3 +32,4 @@ class WeaknessListResponse(BaseModel):
     total_evidence: int
     is_sufficient: bool
     analyzed_at: Optional[datetime] = None
+

@@ -147,3 +147,4 @@ class AutofillResponse(BaseModel):
     website_title: Optional[str] = None
     website_description: Optional[str] = None
     suggestions: List[AutofillSuggestion] = Field(default_factory=list)
+

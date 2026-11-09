@@ -21,3 +21,4 @@ def run_migrations(engine):
             except Exception:
                 pass  # Column already exists
     logger.info("Database schema migrations verified.")
+

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.ads import router as ads_router
+from app.api.v1.alerts import router as alerts_router
 from app.api.v1.competitors import router as competitors_router
 from app.api.v1.discovery import router as discovery_router
 from app.api.v1.evidence import router as evidence_router
@@ -18,4 +19,5 @@ api_router.include_router(evidence_router)
 api_router.include_router(opportunities_router)
 api_router.include_router(ads_router)
 api_router.include_router(posters_router)
+api_router.include_router(alerts_router)
 api_router.include_router(health_router)

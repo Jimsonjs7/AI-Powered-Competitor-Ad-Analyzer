@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Any, List, Union
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,7 +47,15 @@ class Settings(BaseSettings):
     monthly_cost_cap_usd: float = 10.0
     scrape_timeout_seconds: int = 35
     min_seconds_between_requests: float = 2.0
-    media_storage_dir: str = "./media_storage"
+    media_storage_dir_raw: str = Field(default="./media_storage", alias="media_storage_dir")
+
+    @property
+    def media_storage_dir(self) -> str:
+        d = self.media_storage_dir_raw
+        if d.startswith("./") or not Path(d).is_absolute():
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            return str(project_root / d.lstrip("./"))
+        return d
     auto_scrape_enabled: bool = False
     auto_scrape_interval_hours: int = 24
 

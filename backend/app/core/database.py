@@ -1,12 +1,19 @@
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings
 
-# Configure SQLite or PostgreSQL engine
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+# Canonical database path resolution
+db_url = settings.database_url
+if db_url.startswith("sqlite:///./"):
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
+    db_file = project_root / db_url.replace("sqlite:///./", "")
+    db_url = f"sqlite:///{db_file}"
+
+connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
 
 engine = create_engine(
-    settings.database_url,
+    db_url,
     connect_args=connect_args,
     pool_pre_ping=True,
 )
@@ -21,4 +28,3 @@ def get_db():
         yield db
     finally:
         db.close()
-

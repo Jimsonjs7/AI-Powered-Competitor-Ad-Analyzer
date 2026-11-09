@@ -11,6 +11,7 @@ from app.models.competitor_metrics import CompetitorMetrics
 from app.models.evidence import EvidenceItem
 from app.models.weakness import Weakness
 from app.models.opportunity import ObjectionCluster, Opportunity
+from app.models.alert import Alert
 
 __all__ = [
     "Base",
@@ -30,4 +31,5 @@ __all__ = [
     "Weakness",
     "ObjectionCluster",
     "Opportunity",
+    "Alert",
 ]

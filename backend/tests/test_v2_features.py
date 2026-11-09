@@ -11,11 +11,11 @@ def client():
 
 
 def test_profile_lifecycle(client):
-    # 1. Get profile (initializes default or returns active)
+    # 1. Get profile (returns blank template when clean)
     res = client.get("/api/v1/profile")
     assert res.status_code == 200
     data = res.json()
-    assert "BrandMonk" in data["name"]
+    assert data["id"] == 0 or "BrandMonk" in data["name"]
 
     # 2. Update profile with courses, claims, and location
     update_payload = {

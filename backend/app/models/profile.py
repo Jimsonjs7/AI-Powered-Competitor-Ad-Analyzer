@@ -77,3 +77,4 @@ class ProfileSocialAccount(Base):
     verified = Column(Boolean, default=False)
 
     profile = relationship("BusinessProfile", back_populates="social_accounts")
+
