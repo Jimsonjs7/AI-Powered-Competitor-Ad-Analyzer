@@ -41,3 +41,4 @@ def setup_test_db():
             os.remove(TEST_DB_FILE)
         except Exception:
             pass
+

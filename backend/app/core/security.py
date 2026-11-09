@@ -29,7 +29,7 @@ def verify_auth_token(credentials: HTTPAuthorizationCredentials | None = Securit
     return True
 
 
-def validate_target_url(raw_url: str) -> str:
+def validate_target_url(raw_url: str, check_whitelist: bool = True) -> str:
     # Ensure URL is HTTPS and belongs to allowed public ad platforms
     parsed = urlparse(raw_url.strip())
     if parsed.scheme.lower() not in ("https", "http"):
@@ -61,16 +61,17 @@ def validate_target_url(raw_url: str) -> str:
             detail="Unable to resolve target domain.",
         )
 
-    # Host whitelist verification
-    normalized_host = host.lower()
-    if not any(
-        normalized_host == allowed or normalized_host.endswith("." + allowed)
-        for allowed in settings.ssrf_allowed_hosts
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Host '{host}' is not in the allowed source domain list.",
-        )
+    # Host whitelist verification (e.g. for Meta Ad Library links)
+    if check_whitelist:
+        normalized_host = host.lower()
+        if not any(
+            normalized_host == allowed or normalized_host.endswith("." + allowed)
+            for allowed in settings.ssrf_allowed_hosts
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Host '{host}' is not in the allowed source domain list.",
+            )
 
     return raw_url.strip()
 

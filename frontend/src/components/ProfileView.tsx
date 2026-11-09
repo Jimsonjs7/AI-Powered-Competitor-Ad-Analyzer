@@ -29,6 +29,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
   const [area, setArea] = useState("");
   const [radiusKm, setRadiusKm] = useState(10);
   const [website, setWebsite] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [domainsStr, setDomainsStr] = useState("AI, Digital marketing, UI/UX");
   const [preferredCta, setPreferredCta] = useState("Book a free demo");
 
@@ -54,6 +58,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
       setArea(p.area || "");
       setRadiusKm(p.radius_km || 10);
       setWebsite(p.website || "");
+      const fb = (p.social_accounts || []).find((s) => s.platform.toLowerCase() === "facebook");
+      if (fb) setFacebookUrl(fb.url_or_handle);
+      const ig = (p.social_accounts || []).find((s) => s.platform.toLowerCase() === "instagram");
+      if (ig) setInstagramUrl(ig.url_or_handle);
+      const li = (p.social_accounts || []).find((s) => s.platform.toLowerCase() === "linkedin");
+      if (li) setLinkedinUrl(li.url_or_handle);
+      const yt = (p.social_accounts || []).find((s) => s.platform.toLowerCase() === "youtube");
+      if (yt) setYoutubeUrl(yt.url_or_handle);
       setDomainsStr((p.domains || []).join(", "));
       setPreferredCta(p.preferred_cta || "Book a free demo");
       setServices(p.services || []);
@@ -72,6 +84,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
     setStatusMsg("");
     try {
       const domainsArr = domainsStr.split(",").map((s) => s.trim()).filter(Boolean);
+      const socialAccountsPayload = [
+        ...(facebookUrl.trim() ? [{ platform: "facebook", url_or_handle: facebookUrl.trim(), verified: true }] : []),
+        ...(instagramUrl.trim() ? [{ platform: "instagram", url_or_handle: instagramUrl.trim(), verified: true }] : []),
+        ...(linkedinUrl.trim() ? [{ platform: "linkedin", url_or_handle: linkedinUrl.trim(), verified: true }] : []),
+        ...(youtubeUrl.trim() ? [{ platform: "youtube", url_or_handle: youtubeUrl.trim(), verified: true }] : []),
+      ];
       await updateProfile({
         name,
         tagline,
@@ -84,6 +102,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
         preferred_cta: preferredCta,
         services,
         claims,
+        social_accounts: socialAccountsPayload,
       });
       setStatusMsg("Profile saved successfully.");
       loadData();
@@ -102,13 +121,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
     try {
       const res = await autofillProfile(autofillUrl.trim());
       for (const s of res.suggestions) {
-        if (s.field === "name" && !name) setName(s.suggested_value);
-        if (s.field === "description" && !description) setDescription(s.suggested_value);
+        if (s.field === "name") setName(s.suggested_value);
+        if (s.field === "tagline") setTagline(s.suggested_value);
+        if (s.field === "description") setDescription(s.suggested_value);
+        if (s.field === "domains") setDomainsStr(s.suggested_value);
+        if (s.field === "city") setCity(s.suggested_value);
+        if (s.field === "social_facebook") setFacebookUrl(s.suggested_value);
+        if (s.field === "social_instagram") setInstagramUrl(s.suggested_value);
+        if (s.field === "social_linkedin") setLinkedinUrl(s.suggested_value);
+        if (s.field === "social_youtube") setYoutubeUrl(s.suggested_value);
       }
       setWebsite(autofillUrl.trim());
       setStatusMsg(`Found ${res.suggestions.length} suggestions from website.`);
-    } catch (err) {
-      setStatusMsg("Could not fetch details from that URL. Check domain and retry.");
+    } catch (err: any) {
+      setStatusMsg(err?.message || "Could not fetch details from that URL. Check domain and retry.");
     } finally {
       setIsAutofilling(false);
     }
@@ -470,11 +496,57 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Website URL</label>
             <input
               type="text"
-              placeholder="https://brandmonk.academy"
+              placeholder="https://brandmonkconsulting.com/"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
             />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Facebook page URL</label>
+              <input
+                type="text"
+                placeholder="https://www.facebook.com/BrandMonkconsulting/"
+                value={facebookUrl}
+                onChange={(e) => setFacebookUrl(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Instagram profile URL</label>
+              <input
+                type="text"
+                placeholder="https://www.instagram.com/brandmonkconsulting/"
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>LinkedIn company URL</label>
+              <input
+                type="text"
+                placeholder="https://in.linkedin.com/company/brandmonkconsulting"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>YouTube channel URL</label>
+              <input
+                type="text"
+                placeholder="https://www.youtube.com/channel/..."
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
           </div>
 
           <div style={{ marginTop: 10, padding: 14, background: "var(--canvas)", borderRadius: 6 }}>

@@ -382,7 +382,7 @@ class ProfileService:
         )
 
     def autofill_from_website(self, website_url: str) -> AutofillResponse:
-        safe_url = validate_target_url(website_url)
+        safe_url = validate_target_url(website_url, check_whitelist=False)
         title = None
         description = None
         suggestions = []
@@ -396,13 +396,31 @@ class ProfileService:
                     title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
                     if title_match:
                         title = title_match.group(1).strip()
+                        parts = [p.strip() for p in re.split(r"[-|–—:]", title) if p.strip()]
+                        seo_indicators = ["best ", "top ", " agency in", " company in", " services in", " institute in", " training in"]
+                        
+                        if len(parts) > 1 and any(ind in parts[0].lower() for ind in seo_indicators) and not any(ind in parts[-1].lower() for ind in seo_indicators):
+                            suggested_name = parts[-1]
+                            suggested_tagline = parts[0]
+                        else:
+                            suggested_name = parts[0] if parts else title
+                            suggested_tagline = parts[1] if len(parts) > 1 else None
+
                         suggestions.append(
                             AutofillSuggestion(
                                 field="name",
-                                suggested_value=title.split("-")[0].split("|")[0].strip(),
+                                suggested_value=suggested_name,
                                 source_url=safe_url,
                             )
                         )
+                        if suggested_tagline:
+                            suggestions.append(
+                                AutofillSuggestion(
+                                    field="tagline",
+                                    suggested_value=suggested_tagline,
+                                    source_url=safe_url,
+                                )
+                            )
 
                     # Extract meta description
                     desc_match = re.search(
@@ -419,6 +437,43 @@ class ProfileService:
                                 source_url=safe_url,
                             )
                         )
+
+                    # Detect domains and city from text
+                    combined_text = f"{title or ''} {description or ''}"
+                    possible_domains = [
+                        "Digital marketing",
+                        "SEO",
+                        "Paid ads",
+                        "Social media marketing",
+                        "Branding",
+                        "Content strategy",
+                        "AI",
+                        "UI/UX",
+                        "Web development",
+                    ]
+                    matched_domains = [
+                        d for d in possible_domains if re.search(r"\b" + re.escape(d.split()[0]) + r"\b", combined_text, re.IGNORECASE)
+                    ]
+                    if matched_domains:
+                        suggestions.append(
+                            AutofillSuggestion(
+                                field="domains",
+                                suggested_value=", ".join(matched_domains),
+                                source_url=safe_url,
+                            )
+                        )
+
+                    # Detect city
+                    for city_candidate in ["Coimbatore", "Chennai", "Bangalore", "Bengaluru", "Hyderabad", "Mumbai", "Delhi"]:
+                        if re.search(r"\b" + re.escape(city_candidate) + r"\b", combined_text, re.IGNORECASE):
+                            suggestions.append(
+                                AutofillSuggestion(
+                                    field="city",
+                                    suggested_value=city_candidate,
+                                    source_url=safe_url,
+                                )
+                            )
+                            break
 
                     # Search social links
                     social_patterns = {
