@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.competitor import Competitor
+from app.models.competitor_metrics import CompetitorMetrics
 from app.schemas.competitor import (
     CompetitorCreate,
     CompetitorDiscoverItem,
     CompetitorDiscoverRequest,
+    CompetitorMetricsResponse,
     CompetitorResponse,
     ConfidenceLevel,
     PageResolveResponse,
@@ -21,27 +23,84 @@ class CompetitorService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_competitors(self, city: Optional[str] = None) -> List[CompetitorResponse]:
+    def _to_response(self, c: Competitor) -> CompetitorResponse:
+        metrics_res = None
+        if c.metrics:
+            metrics_res = CompetitorMetricsResponse(
+                active_ads=c.metrics.active_ads,
+                new_this_week=c.metrics.new_this_week,
+                longest_run_days=c.metrics.longest_run_days,
+                rating=c.metrics.rating,
+                review_count=c.metrics.review_count,
+                negative_share=c.metrics.negative_share,
+                comment_count=c.metrics.comment_count,
+                weakness_score=c.metrics.weakness_score,
+                threat_score=c.metrics.threat_score,
+                computed_at=c.metrics.computed_at,
+            )
+
+        active_count = len([a for a in c.ads if a.is_active])
+        return CompetitorResponse(
+            id=c.id,
+            name=c.name,
+            city=c.city,
+            course=c.course,
+            website=c.website,
+            fb_page_id=c.fb_page_id,
+            confidence=ConfidenceLevel(c.confidence),
+            active_ads_count=active_count,
+            is_active=c.is_active,
+            lat=c.lat,
+            lng=c.lng,
+            distance_km=c.distance_km,
+            area=c.area,
+            ig_handle=c.ig_handle,
+            data_status=c.data_status or "pending",
+            metrics=metrics_res,
+            created_at=c.created_at,
+        )
+
+    def list_competitors(
+        self,
+        city: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        has_ads: Optional[bool] = None,
+        data_status: Optional[str] = None,
+        max_distance_km: Optional[float] = None,
+    ) -> List[CompetitorResponse]:
         query = self.db.query(Competitor)
         if city:
             query = query.filter(Competitor.city.ilike(f"%{city}%"))
+        if data_status:
+            query = query.filter(Competitor.data_status == data_status)
+        if max_distance_km is not None:
+            query = query.filter(Competitor.distance_km <= max_distance_km)
+
         competitors = query.all()
 
-        return [
-            CompetitorResponse(
-                id=c.id,
-                name=c.name,
-                city=c.city,
-                course=c.course,
-                website=c.website,
-                fb_page_id=c.fb_page_id,
-                confidence=ConfidenceLevel(c.confidence),
-                active_ads_count=len([a for a in c.ads if a.is_active]),
-                is_active=c.is_active,
-                created_at=c.created_at,
-            )
-            for c in competitors
-        ]
+        if has_ads is not None:
+            if has_ads:
+                competitors = [c for c in competitors if any(a.is_active for a in c.ads)]
+            else:
+                competitors = [c for c in competitors if not any(a.is_active for a in c.ads)]
+
+        responses = [self._to_response(c) for c in competitors]
+
+        # Sorting logic
+        if sort_by == "active_ads":
+            responses.sort(key=lambda x: x.active_ads_count, reverse=True)
+        elif sort_by == "distance":
+            responses.sort(key=lambda x: (x.distance_km if x.distance_km is not None else 999.0))
+        elif sort_by == "weakness":
+            responses.sort(key=lambda x: (x.metrics.weakness_score if x.metrics else 0.0), reverse=True)
+        elif sort_by == "name":
+            responses.sort(key=lambda x: x.name.lower())
+
+        return responses
+
+    def get_competitor(self, competitor_id: int) -> Optional[CompetitorResponse]:
+        c = self.db.query(Competitor).filter(Competitor.id == competitor_id).first()
+        return self._to_response(c) if c else None
 
     def resolve_page_id(self, input_text: str) -> PageResolveResponse:
         text = input_text.strip()
@@ -112,13 +171,13 @@ class CompetitorService:
                 name=c.name,
                 city=c.city,
                 course=c.course,
+                website=c.website,
                 suggested_page_id=c.fb_page_id or f"page_{c.name.lower().replace(' ', '_')}",
                 confidence=ConfidenceLevel(c.confidence),
             )
             for c in db_matches
         ]
 
-        # If database has no matches for the query, generate a discover suggestion from input
         if not results and req.query:
             clean_slug = re.sub(r"[^a-zA-Z0-9]+", "_", req.query.lower()).strip("_")
             results.append(
@@ -141,7 +200,6 @@ class CompetitorService:
         resolved_page_id = data.fb_page_id
         confidence = ConfidenceLevel.high.value
 
-        # Resolve Page ID if not provided or if URL passed
         if not resolved_page_id:
             resolved = self.resolve_page_id(data.fb_page_url or data.name)
             resolved_page_id = resolved.resolved_page_id
@@ -154,9 +212,21 @@ class CompetitorService:
             website=data.website,
             fb_page_id=resolved_page_id,
             confidence=confidence,
+            lat=data.lat,
+            lng=data.lng,
+            distance_km=data.distance_km,
+            area=data.area,
+            ig_handle=data.ig_handle,
+            data_status="pending",
             is_active=True,
         )
         self.db.add(competitor)
         self.db.commit()
         self.db.refresh(competitor)
+
+        # Initialize metrics record
+        metrics = CompetitorMetrics(competitor_id=competitor.id)
+        self.db.add(metrics)
+        self.db.commit()
+
         return competitor

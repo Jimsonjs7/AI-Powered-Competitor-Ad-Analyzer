@@ -1,3 +1,16 @@
+export interface CompetitorMetrics {
+  active_ads: number;
+  new_this_week: number;
+  longest_run_days: number;
+  rating: number | null;
+  review_count: number;
+  negative_share: number;
+  comment_count: number;
+  weakness_score: number;
+  threat_score: number;
+  computed_at: string | null;
+}
+
 export interface Competitor {
   id: number;
   name: string;
@@ -8,6 +21,13 @@ export interface Competitor {
   confidence: "high" | "medium" | "low" | "needs_review";
   active_ads_count: number;
   is_active: boolean;
+  lat?: number | null;
+  lng?: number | null;
+  distance_km?: number | null;
+  area?: string | null;
+  ig_handle?: string | null;
+  data_status: "pending" | "has_ads" | "ready" | "analyzed";
+  metrics?: CompetitorMetrics | null;
   created_at: string;
 }
 
@@ -75,4 +95,134 @@ export interface MarketInsight {
   course_distribution: Record<string, number>;
   gap_course: string;
   total_active_ads: number;
+}
+
+// Phase A: Profile Types
+export interface ProfileServiceItem {
+  id?: number;
+  name: string;
+  description?: string;
+  fee_min?: number;
+  fee_max?: number;
+  duration?: string;
+  mode?: string;
+  next_batch?: string;
+  outcomes?: string;
+}
+
+export interface ProfileClaimItem {
+  id?: number;
+  text: string;
+  proof_link?: string;
+  approved: boolean;
+}
+
+export interface ProfileSocialItem {
+  id?: number;
+  platform: string;
+  url_or_handle: string;
+  verified?: boolean;
+}
+
+export interface BusinessProfile {
+  id: number;
+  version: number;
+  name: string;
+  description?: string;
+  tagline?: string;
+  business_type: string[];
+  domains: string[];
+  city: string;
+  area?: string;
+  lat?: number;
+  lng?: number;
+  radius_km: number;
+  website?: string;
+  tone: string;
+  target_audience?: string;
+  price_positioning: string;
+  languages: string[];
+  primary_goal: string;
+  monthly_budget_range?: string;
+  preferred_cta: string;
+  thresholds: {
+    min_ads: number;
+    min_reviews: number;
+    min_comments: number;
+  };
+  services: ProfileServiceItem[];
+  claims: ProfileClaimItem[];
+  social_accounts: ProfileSocialItem[];
+}
+
+export interface ProfileCompleteness {
+  score: number;
+  missing_fields: Array<{ field: string; hint: string; impact: string }>;
+  is_ready_for_discovery: boolean;
+}
+
+// Phase B: Discovery Types
+export interface DiscoveryRunResponse {
+  run_id: number;
+  status: string;
+  message: string;
+}
+
+export interface DiscoveryStatus {
+  run_id: number;
+  status: string;
+  current_step?: string;
+  radius_km: number;
+  counts: Record<string, number>;
+  started_at: string;
+  finished_at?: string;
+}
+
+// Phase D & E: Evidence and Weakness Types
+export interface WeaknessItem {
+  id: number;
+  competitor_id: number;
+  category: string;
+  summary: string;
+  evidence_count: number;
+  sample_size: number;
+  share_percent: number;
+  confidence: "high" | "medium" | "low";
+  severity: number;
+  computed_at: string;
+}
+
+export interface DataSufficiency {
+  competitor_id: number;
+  ads_count: number;
+  reviews_count: number;
+  comments_count: number;
+  is_sufficient: boolean;
+  missing: string[];
+}
+
+// Phase F: Opportunity Types
+export interface OpportunityItem {
+  id: number;
+  cluster_id: number;
+  cluster_label: string;
+  category: string;
+  score: number;
+  counter_angle?: string;
+  formats: string[];
+  headlines: string[];
+  primary_text?: string;
+  missing_proof: string[];
+  status: string;
+}
+
+export interface OpportunityDraft {
+  opportunity_id: number;
+  headline_options: string[];
+  primary_text: string;
+  cta: string;
+  recommended_format: string;
+  used_claims: string[];
+  missing_claims: string[];
+  compliance_note: string;
 }

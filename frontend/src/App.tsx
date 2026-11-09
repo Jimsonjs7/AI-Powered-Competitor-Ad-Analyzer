@@ -4,6 +4,9 @@ import { CompetitorRail } from "./components/CompetitorRail";
 import { AdWall } from "./components/AdWall";
 import { DetailPane } from "./components/DetailPane";
 import { DesignNotes } from "./components/DesignNotes";
+import { ProfileView } from "./components/ProfileView";
+import { OpportunitiesView } from "./components/OpportunitiesView";
+import { CompetitorTableView } from "./components/CompetitorTableView";
 import { Ad, Competitor, MarketInsight } from "./types";
 import {
   addCompetitor,
@@ -11,14 +14,16 @@ import {
   fetchCompetitors,
   fetchHealth,
   fetchMarketInsights,
+  fetchProfileCompleteness,
   refreshAds,
 } from "./api/client";
 
 export const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<"wall" | "competitors" | "opportunities" | "profile" | "notes">("wall");
   const [city, setCity] = useState("Coimbatore");
   const [statusText, setStatusText] = useState("All 3 ad sources responding");
-  const [showNotes, setShowNotes] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [completenessScore, setCompletenessScore] = useState<number>(0);
 
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [selectedCompetitorNames, setSelectedCompetitorNames] = useState<Set<string>>(
@@ -32,16 +37,23 @@ export const App: React.FC = () => {
   const [selectedAdId, setSelectedAdId] = useState<number | null>(null);
   const [isPaneOpen, setIsPaneOpen] = useState(false);
 
-  // Load initial health status
+  // Load health & profile completeness
+  const loadCompleteness = () => {
+    fetchProfileCompleteness()
+      .then((c) => setCompletenessScore(c.score))
+      .catch(() => setCompletenessScore(50));
+  };
+
   useEffect(() => {
     fetchHealth()
       .then((h) => setStatusText(h.message))
       .catch(() => setStatusText("Ad source service active"));
+    loadCompleteness();
   }, []);
 
   // Load competitors
   const loadCompetitors = useCallback(() => {
-    fetchCompetitors(city)
+    fetchCompetitors({ city })
       .then((data) => {
         setCompetitors(data);
         setSelectedCompetitorNames(new Set(data.map((c) => c.name)));
@@ -77,7 +89,6 @@ export const App: React.FC = () => {
       sortBy: sortBy,
     })
       .then((data) => {
-        // Filter by selected competitor names locally
         const filtered = data.filter((a) =>
           selectedCompetitorNames.size > 0 ? selectedCompetitorNames.has(a.competitor_name) : true
         );
@@ -136,8 +147,10 @@ export const App: React.FC = () => {
     setIsPaneOpen(true);
   };
 
-  // Keyboard navigation
+  // Keyboard navigation for ad wall
   useEffect(() => {
+    if (currentView !== "wall") return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsPaneOpen(false);
@@ -165,25 +178,47 @@ export const App: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [ads, selectedAdId]);
+  }, [ads, selectedAdId, currentView]);
 
   const selectedAd = ads.find((a) => a.id === selectedAdId) || ads[0] || null;
 
   return (
     <>
       <TopBar
+        currentView={currentView}
+        onSelectView={setCurrentView}
         statusText={statusText}
         selectedCity={city}
         onCityChange={(c) => setCity(c)}
-        showNotes={showNotes}
-        onToggleNotes={() => setShowNotes(!showNotes)}
         onRefreshAds={handleRefreshAds}
         isRefreshing={isRefreshing}
+        completenessScore={completenessScore}
       />
 
-      {showNotes ? (
-        <DesignNotes onBack={() => setShowNotes(false)} />
-      ) : (
+      {currentView === "profile" && (
+        <ProfileView
+          onBack={() => setCurrentView("wall")}
+          onProfileUpdated={loadCompleteness}
+        />
+      )}
+
+      {currentView === "opportunities" && (
+        <OpportunitiesView onBack={() => setCurrentView("wall")} />
+      )}
+
+      {currentView === "competitors" && (
+        <CompetitorTableView
+          competitors={competitors}
+          onBack={() => setCurrentView("wall")}
+          onRefreshCompetitors={loadCompetitors}
+        />
+      )}
+
+      {currentView === "notes" && (
+        <DesignNotes onBack={() => setCurrentView("wall")} />
+      )}
+
+      {currentView === "wall" && (
         <div className="shell" id="work">
           <CompetitorRail
             competitors={competitors}

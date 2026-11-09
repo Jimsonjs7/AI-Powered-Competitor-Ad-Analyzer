@@ -7,6 +7,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.logging import get_logger
+from app.core.migrations import run_migrations
 from app.jobs.scheduler import scheduler_daemon_loop
 
 logger = get_logger("main")
@@ -16,6 +17,7 @@ logger = get_logger("main")
 async def lifespan(app: FastAPI):
     # Initialize database tables and media directories
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     os.makedirs(os.path.join(settings.media_storage_dir, "creatives"), exist_ok=True)
     os.makedirs(os.path.join(settings.media_storage_dir, "posters"), exist_ok=True)
     logger.info("Database schema and media storage initialized.")

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
 from app.schemas.competitor import (
@@ -18,10 +18,32 @@ router = APIRouter(prefix="/competitors", tags=["competitors"], dependencies=[Au
 @router.get("", response_model=List[CompetitorResponse])
 def get_competitors(
     city: Optional[str] = Query(None, description="Filter competitors by city"),
+    sort_by: Optional[str] = Query(None, description="Sort: active_ads, distance, weakness, name"),
+    has_ads: Optional[bool] = Query(None, description="Filter competitors with/without active ads"),
+    data_status: Optional[str] = Query(None, description="Filter by data sufficiency status"),
+    max_distance_km: Optional[float] = Query(None, description="Max distance in km from profile location"),
     db: Session = DbDependency,
 ):
     service = CompetitorService(db)
-    return service.list_competitors(city=city)
+    return service.list_competitors(
+        city=city,
+        sort_by=sort_by,
+        has_ads=has_ads,
+        data_status=data_status,
+        max_distance_km=max_distance_km,
+    )
+
+
+@router.get("/{competitor_id}", response_model=CompetitorResponse)
+def get_competitor(
+    competitor_id: int,
+    db: Session = DbDependency,
+):
+    service = CompetitorService(db)
+    comp = service.get_competitor(competitor_id)
+    if not comp:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Competitor not found.")
+    return comp
 
 
 @router.post("", response_model=CompetitorResponse, status_code=status.HTTP_201_CREATED)
@@ -31,18 +53,7 @@ def add_competitor(
 ):
     service = CompetitorService(db)
     comp = service.create_competitor(payload)
-    return CompetitorResponse(
-        id=comp.id,
-        name=comp.name,
-        city=comp.city,
-        course=comp.course,
-        website=comp.website,
-        fb_page_id=comp.fb_page_id,
-        confidence=comp.confidence,
-        active_ads_count=0,
-        is_active=comp.is_active,
-        created_at=comp.created_at,
-    )
+    return service.get_competitor(comp.id)
 
 
 @router.post("/discover", response_model=List[CompetitorDiscoverItem])
