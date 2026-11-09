@@ -1,9 +1,10 @@
 import React from "react";
-import { Ad } from "../types";
+import { Ad, MarketInsight } from "../types";
 import { AdPosterCard } from "./AdPosterCard";
 
 interface AdWallProps {
   ads: Ad[];
+  marketInsight: MarketInsight | null;
   selectedAdId: number | null;
   selectedCourse: string;
   sortBy: string;
@@ -14,6 +15,7 @@ interface AdWallProps {
 
 export const AdWall: React.FC<AdWallProps> = ({
   ads,
+  marketInsight,
   selectedAdId,
   selectedCourse,
   sortBy,
@@ -27,9 +29,9 @@ export const AdWall: React.FC<AdWallProps> = ({
   return (
     <main className="wall">
       <div className="read">
-        <p>Most ads promise a result with a deadline.</p>
+        <p>{marketInsight?.headline || "Tracking competitor creatives."}</p>
         <p>
-          38% of active ads use it. UI/UX has the fewest ads in Coimbatore, which leaves room for BrandMonk.
+          {marketInsight?.subline || "Add competitors or click Refresh ads to fetch live Meta creatives."}
         </p>
       </div>
 

@@ -4,12 +4,13 @@ import { CompetitorRail } from "./components/CompetitorRail";
 import { AdWall } from "./components/AdWall";
 import { DetailPane } from "./components/DetailPane";
 import { DesignNotes } from "./components/DesignNotes";
-import { Ad, Competitor } from "./types";
+import { Ad, Competitor, MarketInsight } from "./types";
 import {
   addCompetitor,
   fetchAds,
   fetchCompetitors,
   fetchHealth,
+  fetchMarketInsights,
   refreshAds,
 } from "./api/client";
 
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
   );
 
   const [ads, setAds] = useState<Ad[]>([]);
+  const [marketInsight, setMarketInsight] = useState<MarketInsight | null>(null);
   const [selectedCourse, setSelectedCourse] = useState("All");
   const [sortBy, setSortBy] = useState("days");
   const [selectedAdId, setSelectedAdId] = useState<number | null>(null);
@@ -52,6 +54,21 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadCompetitors();
   }, [loadCompetitors]);
+
+  // Load market insights
+  const loadMarketInsights = useCallback(() => {
+    fetchMarketInsights(city)
+      .then((data) => {
+        setMarketInsight(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load insights:", err);
+      });
+  }, [city]);
+
+  useEffect(() => {
+    loadMarketInsights();
+  }, [loadMarketInsights]);
 
   // Load ads
   const loadAds = useCallback(() => {
@@ -94,6 +111,7 @@ export const App: React.FC = () => {
     try {
       await addCompetitor({ name: nameOrUrl, city });
       loadCompetitors();
+      loadMarketInsights();
     } catch (err) {
       console.error("Add competitor failed:", err);
     }
@@ -103,7 +121,9 @@ export const App: React.FC = () => {
     setIsRefreshing(true);
     try {
       await refreshAds();
+      loadCompetitors();
       loadAds();
+      loadMarketInsights();
     } catch (err) {
       console.error("Refresh failed:", err);
     } finally {
@@ -174,6 +194,7 @@ export const App: React.FC = () => {
 
           <AdWall
             ads={ads}
+            marketInsight={marketInsight}
             selectedAdId={selectedAdId}
             selectedCourse={selectedCourse}
             sortBy={sortBy}

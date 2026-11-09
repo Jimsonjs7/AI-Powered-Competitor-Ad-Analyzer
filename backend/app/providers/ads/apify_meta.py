@@ -1,5 +1,7 @@
 import httpx
+import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.providers.ads.base import AdSource
@@ -23,7 +25,7 @@ class ApifyMetaProvider(AdSource):
         keyword: Optional[str] = None,
         country: str = "IN",
         status: str = "active",
-        limit: int = 100,
+        limit: int = 30,
     ) -> List[AdRecord]:
         tokens_pool = self.tokens or settings.all_apify_api_tokens
         if not tokens_pool:
@@ -31,14 +33,31 @@ class ApifyMetaProvider(AdSource):
             return []
 
         formatted_actor_id = self.actor_id.replace("/", "~")
-        url = f"https://api.apify.com/v2/acts/{formatted_actor_id}/run-sync-get-dataset-items"
-        run_input = {
-            "pageIds": [page_id] if page_id else [],
-            "searchQuery": keyword or "",
-            "country": country,
-            "activeStatus": status,
-            "maxAds": limit,
+        url = f"https://api.apify.com/v2/acts/{formatted_actor_id}/run-sync-get-dataset-items?timeout=30"
+
+        # Determine optimal lookup mode for jaybird/meta-ad-library-scraper
+        search_target = page_id or keyword or ""
+        run_input: Dict[str, Any] = {
+            "region": country,
+            "active_only": (status == "active"),
+            "max_ads_per_advertiser": limit,
+            "media_type": "all",
         }
+
+        if search_target.isdigit():
+            run_input["search_mode"] = "page_id"
+            run_input["page_id"] = search_target
+        elif "facebook.com" in search_target or "fb.com" in search_target:
+            run_input["search_mode"] = "page_url"
+            run_input["page_url"] = search_target
+        elif search_target.startswith("page_") and not search_target[5:].isdigit():
+            # Clean slug to keyword search
+            clean_kw = search_target[5:].replace("_", " ").title()
+            run_input["search_mode"] = "keyword"
+            run_input["query"] = clean_kw
+        else:
+            run_input["search_mode"] = "keyword"
+            run_input["query"] = search_target
 
         # Iterate through token failover pool
         for idx, token in enumerate(tokens_pool):
@@ -49,23 +68,26 @@ class ApifyMetaProvider(AdSource):
                         headers={"Authorization": f"Bearer {token}"},
                         json=run_input,
                     )
+
                     if response.status_code == 200:
                         raw_items = response.json()
-                        return [self._normalize(item) for item in raw_items if isinstance(item, dict)]
+                        records = [self._normalize(item) for item in raw_items if isinstance(item, dict) and not item.get("no_ads_found")]
+                        logger.info(f"Apify token #{idx + 1} succeeded: {len(records)} ads collected.")
+                        return records
+
                     elif response.status_code == 201:
-                        # Some actors respond 201 with run metadata
+                        # Asynchronous execution started: poll run status until completion
                         data = response.json()
+                        run_id = data.get("id")
                         dataset_id = data.get("defaultDatasetId")
-                        if dataset_id:
-                            items_res = client.get(
-                                f"https://api.apify.com/v2/datasets/{dataset_id}/items",
-                                headers={"Authorization": f"Bearer {token}"},
-                            )
-                            if items_res.status_code == 200:
-                                return [self._normalize(item) for item in items_res.json() if isinstance(item, dict)]
+                        if run_id and dataset_id:
+                            records = self._poll_run_results(client, token, run_id, dataset_id)
+                            if records is not None:
+                                logger.info(f"Apify run #{run_id} completed: {len(records)} ads collected.")
+                                return records
 
                     logger.warning(
-                        f"Apify token #{idx + 1} request returned status {response.status_code}. Failing over to next token in pool..."
+                        f"Apify token #{idx + 1} returned status {response.status_code}. Failing over to next token..."
                     )
             except Exception as e:
                 logger.warning(
@@ -75,26 +97,88 @@ class ApifyMetaProvider(AdSource):
         logger.info("All configured Apify tokens exhausted or returned no records.")
         return []
 
+    def _poll_run_results(
+        self, client: httpx.Client, token: str, run_id: str, dataset_id: str, max_wait_sec: int = 30
+    ) -> Optional[List[AdRecord]]:
+        start_wait = time.time()
+        while time.time() - start_wait < max_wait_sec:
+            time.sleep(3)
+            try:
+                run_res = client.get(
+                    f"https://api.apify.com/v2/actor-runs/{run_id}",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                if run_res.status_code == 200:
+                    status = run_res.json().get("data", {}).get("status")
+                    if status in ("SUCCEEDED", "ABORTED"):
+                        # Fetch dataset items
+                        ds_res = client.get(
+                            f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+                            headers={"Authorization": f"Bearer {token}"},
+                        )
+                        if ds_res.status_code == 200:
+                            raw_items = ds_res.json()
+                            return [
+                                self._normalize(item)
+                                for item in raw_items
+                                if isinstance(item, dict) and not item.get("no_ads_found")
+                            ]
+                        return []
+                    elif status in ("FAILED", "TIMED-OUT"):
+                        return None
+            except Exception:
+                pass
+        return None
+
     def _normalize(self, raw: Dict[str, Any]) -> AdRecord:
-        archive_id = str(raw.get("id") or raw.get("ad_archive_id") or raw.get("adArchiveID") or "")
+        archive_id = str(
+            raw.get("ad_archive_id")
+            or raw.get("id")
+            or raw.get("adArchiveID")
+            or f"meta_{int(time.time() * 1000)}"
+        )
         page_id = str(raw.get("page_id") or raw.get("pageId") or "")
         page_name = str(raw.get("page_name") or raw.get("pageName") or "Competitor")
 
-        # Extract creative media links
+        # Collect media items (supporting jaybird schema and generic schemas)
         media_items: List[MediaItem] = []
-        images = raw.get("images") or raw.get("snapshot", {}).get("images") or []
-        for img in images:
-            img_url = img if isinstance(img, str) else img.get("url") or img.get("original_image_url")
-            if img_url:
-                media_items.append(MediaItem(type="image", url=str(img_url)))
 
-        videos = raw.get("videos") or raw.get("snapshot", {}).get("videos") or []
-        for vid in videos:
-            vid_url = vid if isinstance(vid, str) else vid.get("url") or vid.get("video_sd_url")
-            if vid_url:
-                media_items.append(MediaItem(type="video", url=str(vid_url)))
+        all_images = raw.get("all_image_urls") or []
+        if isinstance(all_images, list):
+            for img in all_images:
+                if img and isinstance(img, str):
+                    media_items.append(MediaItem(type="image", url=img))
 
-        copy_text = raw.get("body") or raw.get("copy") or raw.get("snapshot", {}).get("body", {}).get("text") or ""
+        single_img = raw.get("image_url")
+        if single_img and isinstance(single_img, str) and not any(m.url == single_img for m in media_items):
+            media_items.append(MediaItem(type="image", url=single_img))
+
+        all_videos = raw.get("all_video_urls") or []
+        if isinstance(all_videos, list):
+            for vid in all_videos:
+                if vid and isinstance(vid, str):
+                    media_items.append(MediaItem(type="video", url=vid))
+
+        single_vid = raw.get("video_url")
+        if single_vid and isinstance(single_vid, str) and not any(m.url == single_vid for m in media_items):
+            media_items.append(MediaItem(type="video", url=single_vid))
+
+        # Fallback to snapshot parsing if present
+        if not media_items:
+            images = raw.get("images") or raw.get("snapshot", {}).get("images") or []
+            for img in images:
+                u = img if isinstance(img, str) else img.get("url") or img.get("original_image_url")
+                if u:
+                    media_items.append(MediaItem(type="image", url=str(u)))
+
+        copy_text = (
+            raw.get("body_text")
+            or raw.get("body")
+            or raw.get("copy")
+            or raw.get("caption")
+            or raw.get("snapshot", {}).get("body", {}).get("text")
+            or ""
+        )
         headline_text = raw.get("title") or raw.get("headline") or raw.get("snapshot", {}).get("title")
         cta_text = raw.get("cta_text") or raw.get("cta") or raw.get("snapshot", {}).get("cta_text")
 
@@ -108,7 +192,7 @@ class ApifyMetaProvider(AdSource):
             cta=str(cta_text) if cta_text else None,
             platforms=raw.get("publisher_platforms") or ["facebook", "instagram"],
             start_date=raw.get("start_date") or raw.get("startDate"),
-            is_active=True,
+            is_active=raw.get("is_active", True),
             media=media_items,
             raw=raw,
         )

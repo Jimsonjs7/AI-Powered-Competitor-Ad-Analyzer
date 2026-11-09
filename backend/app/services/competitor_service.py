@@ -18,38 +18,13 @@ logger = get_logger("service.competitor")
 
 
 class CompetitorService:
-    # Curated regional directory for zero-dependency local discovery
-    DIRECTORY = {
-        "Coimbatore": [
-            {"name": "Nexora Academy", "course": "AI", "page_id": "page_nexora_coimbatore", "conf": ConfidenceLevel.high},
-            {"name": "Growth Lab", "course": "Digital marketing", "page_id": "page_growthlab_cbe", "conf": ConfidenceLevel.high},
-            {"name": "Lumen Design School", "course": "UI/UX", "page_id": "page_lumen_design", "conf": ConfidenceLevel.high},
-            {"name": "CodeBridge Institute", "course": "AI", "page_id": "page_codebridge_cbe", "conf": ConfidenceLevel.high},
-            {"name": "Pixel & Pen Institute", "course": "UI/UX", "page_id": "page_pixelpen_cbe", "conf": ConfidenceLevel.needs_review},
-            {"name": "Skillhub Tech", "course": "Digital marketing", "page_id": "page_skillhub_tech", "conf": ConfidenceLevel.high},
-            {"name": "Appin Technology Lab", "course": "AI", "page_id": "appin_coimbatore", "conf": ConfidenceLevel.medium},
-            {"name": "KGISL MicroCollege", "course": "AI", "page_id": "kgisl_microcollege", "conf": ConfidenceLevel.high},
-            {"name": "FITA Academy Coimbatore", "course": "Digital marketing", "page_id": "fita_coimbatore", "conf": ConfidenceLevel.medium},
-        ],
-        "Kochi": [
-            {"name": "LCC Infotech Kochi", "course": "AI", "page_id": "lcc_kochi", "conf": ConfidenceLevel.medium},
-            {"name": "Zeblearn Technologies", "course": "Digital marketing", "page_id": "zeblearn_kochi", "conf": ConfidenceLevel.medium},
-            {"name": "Edoxi Training Institute", "course": "UI/UX", "page_id": "edoxi_kochi", "conf": ConfidenceLevel.high},
-        ],
-        "Bengaluru": [
-            {"name": "ExcelR Bengaluru", "course": "AI", "page_id": "excelr_blr", "conf": ConfidenceLevel.high},
-            {"name": "Digital Academy 360", "course": "Digital marketing", "page_id": "da360_blr", "conf": ConfidenceLevel.high},
-            {"name": "DesignBoat UI/UX School", "course": "UI/UX", "page_id": "designboat_blr", "conf": ConfidenceLevel.high},
-        ],
-    }
-
     def __init__(self, db: Session):
         self.db = db
 
     def list_competitors(self, city: Optional[str] = None) -> List[CompetitorResponse]:
         query = self.db.query(Competitor)
         if city:
-            query = query.filter(Competitor.city == city)
+            query = query.filter(Competitor.city.ilike(f"%{city}%"))
         competitors = query.all()
 
         return [
@@ -94,12 +69,12 @@ class CompetitorService:
                     candidate = query_id[0] if query_id else candidate
                 return PageResolveResponse(
                     resolved_name=candidate.replace(".", " ").title(),
-                    resolved_page_id=f"page_{candidate.lower()}",
+                    resolved_page_id=candidate.lower(),
                     confidence=ConfidenceLevel.high,
                     source="social_profile_url",
                 )
 
-        # Institute name search in local database
+        # Institute name search in local live database
         existing = (
             self.db.query(Competitor)
             .filter(Competitor.name.ilike(f"%{text}%"))
@@ -113,18 +88,7 @@ class CompetitorService:
                 source="database_match",
             )
 
-        # Search directory
-        for city_list in self.DIRECTORY.values():
-            for item in city_list:
-                if text.lower() in item["name"].lower():
-                    return PageResolveResponse(
-                        resolved_name=item["name"],
-                        resolved_page_id=item["page_id"],
-                        confidence=item["conf"],
-                        source="directory_match",
-                    )
-
-        # Fallback heuristic
+        # Dynamic fallback: clean slug marked for user review
         clean_slug = re.sub(r"[^a-zA-Z0-9]+", "_", text.lower()).strip("_")
         return PageResolveResponse(
             resolved_name=text,
@@ -134,23 +98,38 @@ class CompetitorService:
         )
 
     def discover_competitors(self, req: CompetitorDiscoverRequest) -> List[CompetitorDiscoverItem]:
-        city_items = self.DIRECTORY.get(req.city, self.DIRECTORY["Coimbatore"])
-        results = []
+        query = self.db.query(Competitor)
+        if req.city:
+            query = query.filter(Competitor.city.ilike(f"%{req.city}%"))
+        if req.query:
+            query = query.filter(
+                (Competitor.name.ilike(f"%{req.query}%")) | (Competitor.course.ilike(f"%{req.query}%"))
+            )
+        db_matches = query.limit(req.limit).all()
 
-        for item in city_items:
-            if req.query and req.query.lower() not in item["name"].lower() and req.query.lower() not in item["course"].lower():
-                continue
+        results = [
+            CompetitorDiscoverItem(
+                name=c.name,
+                city=c.city,
+                course=c.course,
+                suggested_page_id=c.fb_page_id or f"page_{c.name.lower().replace(' ', '_')}",
+                confidence=ConfidenceLevel(c.confidence),
+            )
+            for c in db_matches
+        ]
+
+        # If database has no matches for the query, generate a discover suggestion from input
+        if not results and req.query:
+            clean_slug = re.sub(r"[^a-zA-Z0-9]+", "_", req.query.lower()).strip("_")
             results.append(
                 CompetitorDiscoverItem(
-                    name=item["name"],
+                    name=req.query.title(),
                     city=req.city,
-                    course=item["course"],
-                    suggested_page_id=item["page_id"],
-                    confidence=item["conf"],
+                    course="AI",
+                    suggested_page_id=f"page_{clean_slug}",
+                    confidence=ConfidenceLevel.needs_review,
                 )
             )
-            if len(results) >= req.limit:
-                break
 
         return results
 
@@ -181,26 +160,3 @@ class CompetitorService:
         self.db.commit()
         self.db.refresh(competitor)
         return competitor
-
-    def seed_initial_competitors(self):
-        defaults = [
-            ("Nexora Academy", "AI", "page_nexora_coimbatore", "high"),
-            ("Growth Lab", "Digital marketing", "page_growthlab_cbe", "high"),
-            ("Lumen Design School", "UI/UX", "page_lumen_design", "high"),
-            ("CodeBridge Institute", "AI", "page_codebridge_cbe", "high"),
-            ("Pixel & Pen Institute", "UI/UX", "page_pixelpen_cbe", "needs_review"),
-            ("Skillhub Tech", "Digital marketing", "page_skillhub_tech", "high"),
-        ]
-        for name, course, page_id, conf in defaults:
-            existing = self.db.query(Competitor).filter(Competitor.name == name).first()
-            if not existing:
-                c = Competitor(
-                    name=name,
-                    city="Coimbatore",
-                    course=course,
-                    fb_page_id=page_id,
-                    confidence=conf,
-                    is_active=True,
-                )
-                self.db.add(c)
-        self.db.commit()

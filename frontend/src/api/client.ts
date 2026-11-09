@@ -1,4 +1,11 @@
-import { Ad, Competitor, HealthStatus, PosterPromptResponse, PosterRenderResponse } from "../types";
+import {
+  Ad,
+  Competitor,
+  HealthStatus,
+  MarketInsight,
+  PosterPromptResponse,
+  PosterRenderResponse,
+} from "../types";
 
 const API_BASE = "/api/v1";
 
@@ -15,13 +22,23 @@ export async function fetchCompetitors(city?: string): Promise<Competitor[]> {
   return res.json();
 }
 
-export async function addCompetitor(payload: { name: string; course?: string; city?: string }): Promise<Competitor> {
+export async function addCompetitor(payload: { name: string; course?: string; city?: string; fb_page_url?: string }): Promise<Competitor> {
   const res = await fetch(`${API_BASE}/competitors`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to add competitor");
+  return res.json();
+}
+
+export async function resolveCompetitorPage(inputText: string): Promise<{ resolved_name: string; resolved_page_id: string; confidence: string }> {
+  const res = await fetch(`${API_BASE}/competitors/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input_text: inputText }),
+  });
+  if (!res.ok) throw new Error("Failed to resolve Page ID");
   return res.json();
 }
 
@@ -46,11 +63,25 @@ export async function fetchAds(params: {
   return res.json();
 }
 
+export async function fetchMarketInsights(city: string = "Coimbatore"): Promise<MarketInsight> {
+  const res = await fetch(`${API_BASE}/ads/insights/market?city=${encodeURIComponent(city)}`);
+  if (!res.ok) throw new Error("Failed to fetch market insights");
+  return res.json();
+}
+
 export async function refreshAds(): Promise<{ message: string; total_ads_collected: number }> {
   const res = await fetch(`${API_BASE}/ads/refresh`, {
     method: "POST",
   });
   if (!res.ok) throw new Error("Failed to refresh ads");
+  return res.json();
+}
+
+export async function analyzeAd(adId: number) {
+  const res = await fetch(`${API_BASE}/ads/${adId}/analyze`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to analyze ad");
   return res.json();
 }
 

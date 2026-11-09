@@ -66,3 +66,13 @@ export interface HealthStatus {
   message: string;
   providers_health: Record<string, { ok: boolean; last_run: string | null }>;
 }
+
+export interface MarketInsight {
+  headline: string;
+  subline: string;
+  top_hook: string;
+  hook_percentage: number;
+  course_distribution: Record<string, number>;
+  gap_course: string;
+  total_active_ads: number;
+}

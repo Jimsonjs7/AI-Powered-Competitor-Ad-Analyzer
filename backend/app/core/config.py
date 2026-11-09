@@ -42,11 +42,13 @@ class Settings(BaseSettings):
     # Database
     database_url: str = Field(default="sqlite:///./brandmonk.db")
 
-    # Scraping limits and timeouts
+    # Scraping limits and automation
     monthly_cost_cap_usd: float = 10.0
-    scrape_timeout_seconds: int = 120
+    scrape_timeout_seconds: int = 35
     min_seconds_between_requests: float = 2.0
     media_storage_dir: str = "./media_storage"
+    auto_scrape_enabled: bool = False
+    auto_scrape_interval_hours: int = 24
 
     # External Provider Credentials (with multi-key failover pool)
     apify_api_token: str | None = None

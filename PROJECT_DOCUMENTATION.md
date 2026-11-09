@@ -4,9 +4,10 @@
 Ad Desk is an AI-powered competitor ad intelligence and creative generation web application built for BrandMonk Academy. It finds local training institute competitors (in Coimbatore, Kochi, Bengaluru, etc.), gathers active Facebook and Instagram ads from Meta Ad Library through a resilient fallback provider chain, analyses the persuasion mechanics and creative strategy with multimodal AI, and generates original strategy-inspired poster prompts and rendered posters for BrandMonk Academy.
 
 ## 2. Tech Stack
-- Backend: Python 3.14 / FastAPI, Pydantic v2, SQLAlchemy 2, SQLite (dev) / PostgreSQL (prod), httpx, Pillow
-- Ad Collection: Hybrid provider chain (Apify Meta actors, ScrapeCreators, self-hosted Playwright fallback, manual import)
-- AI Analysis: Google Gemini / Anthropic Claude multimodal models with structured JSON schemas
+- Backend: Python 3.14 / FastAPI, Pydantic v2, SQLAlchemy 2, SQLite (dev) / PostgreSQL (prod), httpx, Pillow, uv package manager
+- Ad Collection: Hybrid provider chain (Apify Meta actors with multi-key failover pool, ScrapeCreators, self-hosted Playwright fallback, manual import)
+- Background Jobs: AsyncIO background scheduler daemon (`backend/app/jobs/scheduler.py`) for automated ad scraping, media caching, and AI analysis
+- AI Analysis: Google Gemini (`gemini-3.5-flash-lite`) with multi-key failover pool and structured JSON schemas
 - Poster Generation: Pillow canvas overlay engine with clean AI-generated backgrounds
 - Frontend: React 18, Vite, TypeScript, Tailwind CSS with design tokens, TanStack Query
 - Architecture Pattern: Router -> Service -> Provider (providers hidden behind protocols)
@@ -22,14 +23,16 @@ Ad Desk is an AI-powered competitor ad intelligence and creative generation web 
 |   |-- app/
 |   |   |-- api/             (FastAPI route endpoints, dependency injection)
 |   |   |-- core/            (config, security, database session, logging)
-|   |   |-- models/          (SQLAlchemy database tables)
+|   |   |-- jobs/            (automated scraping and analysis scheduler)
+|   |   |-- models/          (SQLAlchemy database tables: Competitor, Ad, Media, Analysis, Poster, ScrapeRun)
 |   |   |-- providers/
-|   |   |   |-- ads/         (AdSource protocol implementations)
+|   |   |   |-- ads/         (AdSource protocol implementations: Apify, ScrapeCreators, Playwright, Manual)
 |   |   |   |-- images/      (ImageClient protocol implementations)
-|   |   |   `-- llm/         (LLMClient protocol implementations)
+|   |   |   `-- llm/         (LLMClient protocol implementations: Gemini 3-key pool)
 |   |   |-- schemas/         (Pydantic request and response models)
 |   |   `-- services/        (competitor, ad collection, analysis, poster services)
 |   |-- tests/               (unit and integration contract tests)
+|   |-- pyproject.toml       (uv / hatchling build and pytest config)
 |   |-- requirements.txt
 |   `-- run.py
 |-- frontend/
@@ -57,37 +60,72 @@ Ad Desk is an AI-powered competitor ad intelligence and creative generation web 
 - `ad-desk-ui.html`: Authoritative reference design and design system notes
 - `Scraping_Tools_and_Integration_Plan.md`: Ad scraping strategy, provider chain, and normalized schema
 - `backend/app/schemas/ad.py`: Normalized `AdRecord` contract across all providers
-- `backend/app/providers/ads/base.py`: `AdSource` protocol
-- `backend/app/services/ad_service.py`: Provider fallback chain orchestrator
-- `backend/app/core/config.py`: Environment validation and cost caps
+- `backend/app/providers/ads/apify_meta.py`: Apify Meta Ad Library actor adapter with 3-key failover pool
+- `backend/app/jobs/scheduler.py`: Automated ad collection, creative download, and AI analysis scheduler
+- `backend/app/services/ad_service.py`: Provider fallback chain orchestrator and deduplication engine
+- `backend/app/services/competitor_service.py`: Dynamic database-backed competitor queries and Page ID resolver
+- `backend/app/core/config.py`: Environment validation, cost caps, and multi-key rotation pools
 - `frontend/src/App.tsx`: Three-pane desktop workspace (Rail, Wall, Pane) and responsive view
 
-## 5. Setup Process
-### Backend Setup (Recommended: uv)
-`uv` is pre-installed on this machine at `~/.local/bin/uv`.
-1. Navigate to `backend/`
-2. Sync dependencies: `uv sync` (or `~/.local/bin/uv sync`)
-3. Run dev server: `uv run python run.py` (serves on `http://localhost:8000`)
-4. Run tests: `uv run pytest tests/`
+## 5. Setup & Running Process
+### Prerequisites
+Ensure `.env` in the project root contains your API keys:
+```bash
+GEMINI_API_KEY=your_primary_gemini_key
+GEMINI_API_KEY_2=your_backup_gemini_key
+GEMINI_API_KEY_3=your_third_gemini_key
 
-### Backend Setup (Alternative: standard pip)
-1. Navigate to `backend/`
-2. Create and activate virtual environment: `python3 -m venv .venv && source .venv/bin/activate`
-3. Install dependencies: `pip install -r requirements.txt`
-4. Run dev server: `python run.py`
+APIFY_API_TOKEN=your_primary_apify_token
+APIFY_API_TOKEN_2=your_backup_apify_token
+APIFY_API_TOKEN_3=your_third_apify_token
+```
 
-### Frontend Setup
-1. Navigate to `frontend/`
-2. Install dependencies: `npm install`
-3. Run dev server: `npm run dev` (serves on `http://localhost:5173`)
+### Running Backend with uv
+`uv` is pre-installed at `~/.local/bin/uv`.
+1. Navigate to backend:
+   ```bash
+   cd backend
+   ```
+2. Start server:
+   ```bash
+   uv run python run.py
+   ```
+   Server starts at `http://localhost:8000` with Swagger UI at `http://localhost:8000/docs`.
+3. Run tests:
+   ```bash
+   uv run pytest tests/
+   ```
 
-## 6. Current Workflow
-1. Competitor Discovery & Resolution: Add competitor name or Facebook Page URL; system verifies Page ID with confidence rating.
-2. Ad Collection: Ad fetch job iterates through configured provider chain, normalizes payloads into `AdRecord`, downloads media locally, and computes running days.
-3. Analysis: Multimodal model scores ad effectiveness (0-100), extracts hooks, offers, tactics, and BrandMonk opportunities.
-4. Poster Studio: User selects an ad angle (Outcome, Proof, Urgency) and course, reviews prompt, and generates BrandMonk branded creative with dynamic overlay.
+### Running Automated Scraping Scheduler
+You can run the scraping & AI analysis scheduler as a standalone automated job:
+- Single execution run:
+  ```bash
+  cd backend && uv run python -m app.jobs.scheduler --once
+  ```
+- Continuous background daemon (cycles every 24 hours):
+  ```bash
+  cd backend && uv run python -m app.jobs.scheduler --daemon
+  ```
+- Or enable in FastAPI lifespan by setting `AUTO_SCRAPE_ENABLED=true` in `.env`.
 
-## 7. Known Limitations
-- Meta Ad Library does not offer a free commercial API for India; collection relies on hosted scrapers or browser replay.
-- External scraping runs are subject to provider availability; cached ads and offline fallbacks are served during provider outages.
+### Running Frontend
+1. Navigate to frontend:
+   ```bash
+   cd frontend
+   ```
+2. Start Vite development server:
+   ```bash
+   npm run dev
+   ```
+   Web interface opens at `http://localhost:5173`.
+3. Build for production:
+   ```bash
+   npm run build
+   ```
 
+## 6. End-to-End Automated Workflow
+1. **Competitor Onboarding**: Add competitor name, Facebook Page link, or Meta Ad Library link in the sidebar. The resolver detects the Page ID or creates a tracking record with verification status.
+2. **Automated Scraping**: The scheduler loops through active competitors, passes Page IDs/URLs to Apify with multi-key failover, normalizes ad cards, downloads media to `./media_storage/creatives/`, and saves deduplicated records by `ad_archive_id`.
+3. **Automated AI Analysis**: Every new ad is automatically sent to the Gemini 3-key pool (`gemini-3.5-flash-lite`). The AI extracts the hook, offer, target audience, persuasion tactics, and why it works, scoring effectiveness from 0-100.
+4. **Dynamic Market Insights**: Ad Desk aggregates live database ads by city, computing dominant hook frequencies, course distributions, and underserved course gaps.
+5. **BrandMonk Poster Generation**: Choose an ad to examine in the detail pane, click to generate a BrandMonk angle, review the prompt, and render a branded creative badge and overlay.

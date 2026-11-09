@@ -65,3 +65,4 @@ export const CompetitorRail: React.FC<CompetitorRailProps> = ({
     </aside>
   );
 };
+

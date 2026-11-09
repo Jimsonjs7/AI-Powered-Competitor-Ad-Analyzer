@@ -1,40 +1,39 @@
+import asyncio
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import Base, engine
 from app.core.logging import get_logger
-from app.services.ad_service import AdService
-from app.services.competitor_service import CompetitorService
+from app.jobs.scheduler import scheduler_daemon_loop
 
 logger = get_logger("main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables
+    # Initialize database tables and media directories
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables verified and initialized.")
+    os.makedirs(os.path.join(settings.media_storage_dir, "creatives"), exist_ok=True)
+    os.makedirs(os.path.join(settings.media_storage_dir, "posters"), exist_ok=True)
+    logger.info("Database schema and media storage initialized.")
 
-    # Seed initial competitors and ads if empty (instant local seed)
-    db = SessionLocal()
-    try:
-        comp_service = CompetitorService(db)
-        comp_service.seed_initial_competitors()
-
-        from app.models.ad import Ad
-        from app.models.competitor import Competitor
-        if db.query(Ad).count() == 0:
-            first_comp = db.query(Competitor).first()
-            if first_comp:
-                ad_service = AdService(db)
-                ad_service.collect_ads_for_competitor(first_comp.id)
-                logger.info("Initial seed ads verified.")
-    finally:
-        db.close()
+    scheduler_task = None
+    if settings.auto_scrape_enabled:
+        logger.info("Auto-scraping enabled. Launching background scraping daemon...")
+        scheduler_task = asyncio.create_task(scheduler_daemon_loop())
 
     yield
+
+    if scheduler_task:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+
     logger.info("Application shutdown completed.")
 
 
@@ -62,4 +61,3 @@ app.include_router(api_router, prefix="/api")
 @app.get("/health", tags=["health"])
 def root_health():
     return {"status": "ok", "app": settings.app_name}
-

@@ -148,3 +148,4 @@ export const DesignNotes: React.FC<DesignNotesProps> = ({ onBack }) => {
     </div>
   );
 };
+

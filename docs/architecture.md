@@ -5,3 +5,4 @@ Detailed specifications for Ad Desk subsystems:
 - Multimodal prompt and scoring rubric
 - Poster generation safe margins and overlay rendering
 - Security Threat Gate and SSRF protection
+

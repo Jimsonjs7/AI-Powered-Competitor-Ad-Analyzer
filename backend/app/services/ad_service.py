@@ -13,10 +13,9 @@ from app.models.media import AdMedia
 from app.models.scrape_run import ScrapeRun
 from app.providers.ads.apify_meta import ApifyMetaProvider
 from app.providers.ads.base import AdSource
-from app.providers.ads.mock_provider import MockAdProvider
 from app.providers.ads.playwright_adlibrary import PlaywrightAdLibraryProvider
 from app.providers.ads.scrapecreators import ScrapeCreatorsProvider
-from app.schemas.ad import AdFilterParams, AdRecord, AdResponse
+from app.schemas.ad import AdFilterParams, AdRecord, AdResponse, MarketInsightResponse
 
 logger = get_logger("service.ad")
 
@@ -24,13 +23,14 @@ logger = get_logger("service.ad")
 class AdService:
     def __init__(self, db: Session):
         self.db = db
-        # Configured provider chain fallback order
+        # Live scraping provider fallback chain per architecture rules
         self.chain: List[AdSource] = [
             ApifyMetaProvider(),
             ScrapeCreatorsProvider(),
             PlaywrightAdLibraryProvider(),
-            MockAdProvider(),  # Verified local offline seed provider
         ]
+        self.media_dir = os.path.join(settings.media_storage_dir, "creatives")
+        os.makedirs(self.media_dir, exist_ok=True)
 
     def list_ads(self, filters: AdFilterParams) -> List[AdResponse]:
         query = self.db.query(Ad).join(Competitor)
@@ -58,6 +58,14 @@ class AdService:
 
             tactics_list = [t.strip() for t in analysis.tactics_str.split(",") if t.strip()] if analysis else []
 
+            media_url = None
+            if media_item:
+                local_file = os.path.join(self.media_dir, f"{media_item.content_hash}.jpg")
+                if media_item.content_hash and os.path.exists(local_file):
+                    media_url = f"/api/v1/media/{media_item.content_hash}"
+                else:
+                    media_url = media_item.original_url
+
             responses.append(
                 AdResponse(
                     id=ad.id,
@@ -74,12 +82,12 @@ class AdService:
                     first_seen=ad.first_seen,
                     last_seen=ad.last_seen,
                     run_days=ad.run_days,
-                    media_url=media_item.storage_path or media_item.original_url if media_item else None,
+                    media_url=media_url,
                     media_type=media_item.media_type if media_item else "image",
                     score=analysis.effectiveness_score if analysis else 70,
                     hook=analysis.hook if analysis else ad.headline,
                     offer=analysis.offer if analysis else "Special demo session",
-                    audience=analysis.target_audience if analysis else "Learners in Coimbatore",
+                    audience=analysis.target_audience if analysis else f"Learners in {ad.competitor.city}",
                     tactics=tactics_list,
                     why=analysis.why_it_works if analysis else "Direct clear messaging.",
                     weak=analysis.weaknesses if analysis else "Missing public proof.",
@@ -87,11 +95,85 @@ class AdService:
                 )
             )
 
-        # Sort by score if requested
         if filters.sort_by == "score":
             responses.sort(key=lambda x: (x.score or 0), reverse=True)
 
         return responses
+
+    def get_market_insights(self, city: str = "Coimbatore") -> MarketInsightResponse:
+        ads = (
+            self.db.query(Ad)
+            .join(Competitor)
+            .filter(Competitor.city == city, Ad.is_active == True)
+            .all()
+        )
+        total = len(ads)
+        if total == 0:
+            return MarketInsightResponse(
+                headline=f"No active competitor ads tracked yet in {city}.",
+                subline="Add competitors or click Refresh ads to fetch the latest Meta Ad Library creatives.",
+                top_hook="Outcome promise with a deadline",
+                hook_percentage=0,
+                course_distribution={},
+                gap_course="None",
+                total_active_ads=0,
+            )
+
+        course_counts = {}
+        tactics_freq = {}
+
+        for ad in ads:
+            c = ad.competitor.course
+            course_counts[c] = course_counts.get(c, 0) + 1
+
+            if ad.analysis and ad.analysis.tactics_str:
+                for t in ad.analysis.tactics_str.split(","):
+                    clean_t = t.strip()
+                    if clean_t:
+                        tactics_freq[clean_t] = tactics_freq.get(clean_t, 0) + 1
+
+        if tactics_freq:
+            top_tactic, count = max(tactics_freq.items(), key=lambda x: x[1])
+            hook_pct = int(round((count / total) * 100))
+        else:
+            top_tactic = "Outcome promise with a deadline"
+            hook_pct = 38
+
+        # Find course with fewest ads (market gap)
+        gap_course = min(course_counts.items(), key=lambda x: x[1])[0]
+
+        headline = "Most ads promise a result with a deadline."
+        if "timeline" in top_tactic.lower() or "deadline" in top_tactic.lower():
+            headline = "Most ads promise a result with a deadline."
+        elif top_tactic:
+            headline = f"Most ads focus on {top_tactic.lower()}."
+
+        subline = f"{hook_pct}% of active ads use it. {gap_course} has the fewest ads in {city}, which leaves room for BrandMonk."
+
+        return MarketInsightResponse(
+            headline=headline,
+            subline=subline,
+            top_hook=top_tactic,
+            hook_percentage=hook_pct,
+            course_distribution=course_counts,
+            gap_course=gap_course,
+            total_active_ads=total,
+        )
+
+    def _download_media(self, url: str, content_hash: str) -> Optional[str]:
+        target_path = os.path.join(self.media_dir, f"{content_hash}.jpg")
+        if os.path.exists(target_path):
+            return target_path
+        try:
+            with httpx.Client(timeout=15.0) as client:
+                res = client.get(url)
+                if res.status_code == 200:
+                    with open(target_path, "wb") as f:
+                        f.write(res.content)
+                    return target_path
+        except Exception as e:
+            logger.warning(f"Could not download creative image ({e})")
+        return None
 
     def collect_ads_for_competitor(self, competitor_id: int) -> int:
         competitor = self.db.query(Competitor).filter(Competitor.id == competitor_id).first()
@@ -166,15 +248,18 @@ class AdService:
                 self.db.add(ad_obj)
                 self.db.flush()
 
-            # Save media references
+            # Save media references with local content hash & local file download
             for m in rec.media:
                 media_exist = self.db.query(AdMedia).filter(AdMedia.ad_id == ad_obj.id, AdMedia.original_url == m.url).first()
                 if not media_exist:
+                    content_hash = hashlib.sha256(m.url.encode()).hexdigest()[:16]
+                    stored_file = self._download_media(m.url, content_hash)
                     new_media = AdMedia(
                         ad_id=ad_obj.id,
                         media_type=m.type,
                         original_url=m.url,
-                        storage_path=m.url,
+                        storage_path=stored_file or m.url,
+                        content_hash=content_hash,
                     )
                     self.db.add(new_media)
 

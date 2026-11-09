@@ -37,3 +37,4 @@ export const AdPosterCard: React.FC<AdPosterCardProps> = ({ ad, className = "", 
     </div>
   );
 };
+

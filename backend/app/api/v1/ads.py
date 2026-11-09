@@ -1,15 +1,20 @@
+import os
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, HttpUrl
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
+from app.core.config import settings
 from app.core.security import validate_target_url
-from app.schemas.ad import AdFilterParams, AdResponse
+from app.jobs.scheduler import run_scrape_and_analysis_cycle
+from app.models.media import AdMedia
+from app.schemas.ad import AdFilterParams, AdResponse, MarketInsightResponse
 from app.schemas.analysis import AdAnalysisSchema
 from app.services.ad_service import AdService
 from app.services.analysis_service import AnalysisService
 
-router = APIRouter(prefix="/ads", tags=["ads"], dependencies=[AuthDependency])
+router = APIRouter(prefix="", tags=["ads"], dependencies=[AuthDependency])
 
 
 class RefreshAdsResponse(BaseModel):
@@ -25,7 +30,7 @@ class ManualImportRequest(BaseModel):
     headline: Optional[str] = None
 
 
-@router.get("", response_model=List[AdResponse])
+@router.get("/ads", response_model=List[AdResponse])
 def get_ads(
     competitor_ids: Optional[str] = Query(None, description="Comma-separated competitor IDs"),
     course: Optional[str] = Query("All", description="Course filter: All, AI, Digital marketing, UI/UX"),
@@ -49,19 +54,27 @@ def get_ads(
     return service.list_ads(filters)
 
 
-@router.post("/refresh", response_model=RefreshAdsResponse)
-def refresh_ads(
+@router.get("/ads/insights/market", response_model=MarketInsightResponse)
+def get_market_insights(
+    city: str = Query("Coimbatore", description="City region for market analysis"),
     db: Session = DbDependency,
 ):
     service = AdService(db)
-    count = service.refresh_all_competitors()
+    return service.get_market_insights(city=city)
+
+
+@router.post("/ads/refresh", response_model=RefreshAdsResponse)
+def refresh_ads(
+    db: Session = DbDependency,
+):
+    result = run_scrape_and_analysis_cycle(db)
     return RefreshAdsResponse(
-        message=f"Refreshed ads across all active competitors.",
-        total_ads_collected=count,
+        message=f"Refreshed {result['ads_collected']} ads across {result['competitors_count']} competitors; {result['ads_analyzed']} analyzed.",
+        total_ads_collected=result["ads_collected"],
     )
 
 
-@router.post("/{ad_id}/analyze", response_model=AdAnalysisSchema)
+@router.post("/ads/{ad_id}/analyze", response_model=AdAnalysisSchema)
 def analyze_ad(
     ad_id: int,
     db: Session = DbDependency,
@@ -75,12 +88,11 @@ def analyze_ad(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ad analysis failed")
 
 
-@router.post("/import", response_model=RefreshAdsResponse)
+@router.post("/ads/import", response_model=RefreshAdsResponse)
 def manual_import_ad(
     payload: ManualImportRequest,
     db: Session = DbDependency,
 ):
-    # Validate SSRF rules on URL
     validate_target_url(payload.ad_url)
 
     from app.providers.ads.manual_import import ManualImportProvider
@@ -97,7 +109,7 @@ def manual_import_ad(
     )
 
     importer = ManualImportProvider()
-    record = importer.import_from_url(
+    importer.import_from_url(
         ad_url=payload.ad_url,
         page_name=comp.name,
         copy_text=payload.copy_text,
@@ -105,7 +117,6 @@ def manual_import_ad(
     )
 
     ad_service = AdService(db)
-    # Upsert single record
     ad_service.collect_ads_for_competitor(comp.id)
 
     return RefreshAdsResponse(
@@ -113,3 +124,18 @@ def manual_import_ad(
         total_ads_collected=1,
     )
 
+
+@router.get("/media/{content_hash}")
+def get_cached_media(
+    content_hash: str,
+    db: Session = DbDependency,
+):
+    media = db.query(AdMedia).filter(AdMedia.content_hash == content_hash).first()
+    if not media:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found")
+
+    file_path = os.path.join(settings.media_storage_dir, "creatives", f"{content_hash}.jpg")
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="image/jpeg")
+
+    return {"original_url": media.original_url}

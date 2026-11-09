@@ -1,12 +1,60 @@
 import pytest
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.database import SessionLocal
+from app.models.competitor import Competitor
+from app.models.ad import Ad
 from app.core.security import validate_target_url
 from fastapi import HTTPException
 
 
 @pytest.fixture(scope="module")
 def client():
+    # Setup test database records
+    db = SessionLocal()
+    try:
+        sample_competitors = [
+            ("Nexora Academy", "Coimbatore", "AI", "page_nexora_coimbatore", "high"),
+            ("Growth Lab", "Coimbatore", "Digital marketing", "page_growthlab_cbe", "high"),
+            ("Lumen Design School", "Coimbatore", "UI/UX", "page_lumen_design", "high"),
+            ("CodeBridge Institute", "Coimbatore", "AI", "page_codebridge_cbe", "high"),
+            ("Pixel & Pen Institute", "Coimbatore", "UI/UX", "page_pixelpen_cbe", "needs_review"),
+            ("Skillhub Tech", "Coimbatore", "Digital marketing", "page_skillhub_tech", "high"),
+        ]
+        for name, city, course, page_id, conf in sample_competitors:
+            existing = db.query(Competitor).filter(Competitor.name == name).first()
+            if not existing:
+                comp = Competitor(
+                    name=name,
+                    city=city,
+                    course=course,
+                    fb_page_id=page_id,
+                    confidence=conf,
+                    is_active=True,
+                )
+                db.add(comp)
+                db.flush()
+                # Add sample ad for testing
+                ad = Ad(
+                    ad_archive_id=f"test_archive_{comp.id}",
+                    competitor_id=comp.id,
+                    source="test_source",
+                    copy=f"Learn {course} at {name}",
+                    headline=f"Master {course}",
+                    cta="Apply now",
+                    platforms_str="facebook,instagram",
+                    start_date="2026-01-01",
+                    is_active=True,
+                    first_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+                    last_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+                    run_days=comp.id * 10,
+                )
+                db.add(ad)
+        db.commit()
+    finally:
+        db.close()
+
     with TestClient(app) as test_client:
         yield test_client
 
