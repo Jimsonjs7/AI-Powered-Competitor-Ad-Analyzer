@@ -3,6 +3,7 @@ import {
   BusinessProfile,
   Competitor,
   CompetitorCrawlResult,
+  CreativeCounterAdResponse,
   DataSufficiency,
   DiscoveryRunResponse,
   DiscoveryStatus,
@@ -139,6 +140,9 @@ export async function renderPoster(payload: {
   course: string;
   angle_index: number;
   size_format: string;
+  custom_headline?: string;
+  custom_subline?: string;
+  custom_cta?: string;
 }): Promise<PosterRenderResponse> {
   const res = await fetch(`${API_BASE}/posters/render`, {
     method: "POST",
@@ -274,5 +278,11 @@ export async function draftOpportunityAd(opportunityId: number): Promise<Opportu
     body: JSON.stringify({ opportunity_id: opportunityId }),
   });
   if (!res.ok) throw new Error("Failed to draft counter ad");
+  return res.json();
+}
+
+export async function fetchCreativeCounterRecommendations(adId: number): Promise<CreativeCounterAdResponse> {
+  const res = await fetch(`${API_BASE}/ads/${adId}/counter-recommendations`);
+  if (!res.ok) throw new Error("Failed to generate creative recommendations");
   return res.json();
 }

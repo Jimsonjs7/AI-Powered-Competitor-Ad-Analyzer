@@ -11,8 +11,10 @@ from app.jobs.scheduler import run_scrape_and_analysis_cycle
 from app.models.media import AdMedia
 from app.schemas.ad import AdFilterParams, AdResponse, MarketInsightResponse
 from app.schemas.analysis import AdAnalysisSchema
+from app.schemas.creative_recommender import CreativeCounterAdResponse
 from app.services.ad_service import AdService
 from app.services.analysis_service import AnalysisService
+from app.services.creative_recommender_service import CreativeRecommenderService
 
 router = APIRouter(prefix="", tags=["ads"], dependencies=[AuthDependency])
 
@@ -139,3 +141,17 @@ def get_cached_media(
         return FileResponse(file_path, media_type="image/jpeg")
 
     return {"original_url": media.original_url}
+
+
+@router.get("/ads/{ad_id}/counter-recommendations", response_model=CreativeCounterAdResponse)
+@router.post("/ads/{ad_id}/counter-recommendations", response_model=CreativeCounterAdResponse)
+def get_creative_counter_recommendations(
+    ad_id: int,
+    db: Session = DbDependency,
+):
+    service = CreativeRecommenderService(db)
+    try:
+        return service.generate_recommendations(ad_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+

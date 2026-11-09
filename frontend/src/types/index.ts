@@ -239,3 +239,47 @@ export interface OpportunityDraft {
   missing_claims: string[];
   compliance_note: string;
 }
+
+// Creative Ads Recommender
+export interface CompetitorAdFlawAudit {
+  competitor_name: string;
+  headline?: string;
+  copy_snippet: string;
+  active_days: number;
+  detected_hook: string;
+  detected_offer: string;
+  vulnerabilities: string[];
+  creative_fatigue_level: string;
+  unaddressed_prospect_doubts: string[];
+}
+
+export interface CounterCreativeAngle {
+  angle_type: "contrarian" | "proof_roi" | "transparency";
+  angle_name: string;
+  strategic_rationale: string;
+  target_flaw_in_competitor: string;
+  matching_approved_claim: string;
+  hook: string;
+  headline: string;
+  subline: string;
+  primary_text: string;
+  cta_text: string;
+  urgency_tagline?: string;
+  visual_concept: string;
+  composition: string;
+  color_palette: string[];
+  typography_guide: string;
+  aspect_ratios: Record<string, string>;
+  image_prompt: string;
+  negative_prompt: string;
+}
+
+export interface CreativeCounterAdResponse {
+  ad_id: number;
+  client_name: string;
+  course: string;
+  competitor_audit: CompetitorAdFlawAudit;
+  angles: CounterCreativeAngle[];
+  recommended_cta: string;
+  created_at: string;
+}

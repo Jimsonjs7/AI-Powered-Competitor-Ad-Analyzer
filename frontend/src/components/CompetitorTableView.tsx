@@ -6,6 +6,7 @@ import {
   importEvidence,
 } from "../api/client";
 import { Ad, Competitor, WeaknessItem } from "../types";
+import { CreativeRecommenderModal } from "./CreativeRecommenderModal";
 
 interface CompetitorTableViewProps {
   competitors: Competitor[];
@@ -22,6 +23,8 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
   const [detailTab, setDetailTab] = useState<"ads" | "weaknesses">("ads");
   const [competitorAds, setCompetitorAds] = useState<Ad[]>([]);
   const [isLoadingAds, setIsLoadingAds] = useState(false);
+  const [counterAdId, setCounterAdId] = useState<number | null>(null);
+  const [counterMediaUrl, setCounterMediaUrl] = useState<string | null>(null);
   const [weaknesses, setWeaknesses] = useState<WeaknessItem[]>([]);
   const [isLoadingWeakness, setIsLoadingWeakness] = useState(false);
   const [weaknessError, setWeaknessError] = useState("");
@@ -392,11 +395,21 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
                           {ad.copy}
                         </div>
 
-                        {ad.hook && (
-                          <div style={{ marginTop: "auto", fontSize: 11, color: "var(--muted)", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
-                            <strong>Hook:</strong> {ad.hook}
-                          </div>
-                        )}
+                        <div style={{ marginTop: "auto", borderTop: "1px solid var(--line)", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "var(--muted)", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {ad.hook ? `Hook: ${ad.hook}` : "Active Ad"}
+                          </span>
+                          <button
+                            className="btn pri"
+                            onClick={() => {
+                              setCounterAdId(ad.id);
+                              setCounterMediaUrl(ad.media_url);
+                            }}
+                            style={{ fontSize: 11, padding: "3px 8px" }}
+                          >
+                            Counter this Ad
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -524,6 +537,14 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Strategic Creative Counter-Ad Recommender Modal */}
+      <CreativeRecommenderModal
+        adId={counterAdId}
+        isOpen={!!counterAdId}
+        onClose={() => setCounterAdId(null)}
+        competitorMediaUrl={counterMediaUrl}
+      />
     </div>
   );
 };

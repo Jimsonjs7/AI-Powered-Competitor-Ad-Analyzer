@@ -527,3 +527,4 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
     </div>
   );
 };
+

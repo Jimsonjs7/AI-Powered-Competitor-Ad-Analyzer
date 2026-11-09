@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Ad } from "../types";
 import { AdPosterCard } from "./AdPosterCard";
 import { renderPoster } from "../api/client";
+import { CreativeRecommenderModal } from "./CreativeRecommenderModal";
 
 interface DetailPaneProps {
   ad: Ad | null;
@@ -47,6 +48,7 @@ const ANGLES = [
 
 export const DetailPane: React.FC<DetailPaneProps> = ({ ad, isOpen, onClose }) => {
   const [tabMode, setTabMode] = useState<"analysis" | "poster">("analysis");
+  const [isRecommenderOpen, setIsRecommenderOpen] = useState(false);
   const [brandCourse, setBrandCourse] = useState<string>("AI");
   const [angleIndex, setAngleIndex] = useState<number>(0);
   const [sizeFormat, setSizeFormat] = useState<string>("feed");
@@ -99,7 +101,7 @@ export const DetailPane: React.FC<DetailPaneProps> = ({ ad, isOpen, onClose }) =
         <button className="btn bk" onClick={onClose} aria-label="Back to ads">
           Back
         </button>
-        <div role="tablist" style={{ display: "flex", gap: "4px" }}>
+        <div role="tablist" style={{ display: "flex", gap: "4px", alignItems: "center" }}>
           <button
             className="t"
             role="tab"
@@ -114,7 +116,14 @@ export const DetailPane: React.FC<DetailPaneProps> = ({ ad, isOpen, onClose }) =
             aria-selected={tabMode === "poster"}
             onClick={() => setTabMode("poster")}
           >
-            Poster for BrandMonk
+            Quick Poster
+          </button>
+          <button
+            className="btn pri"
+            onClick={() => setIsRecommenderOpen(true)}
+            style={{ fontSize: 11, padding: "4px 8px", marginLeft: 4 }}
+          >
+            Counter-Ad Strategy
           </button>
         </div>
       </div>
@@ -295,6 +304,13 @@ export const DetailPane: React.FC<DetailPaneProps> = ({ ad, isOpen, onClose }) =
           </div>
         </>
       )}
+
+      <CreativeRecommenderModal
+        adId={ad.id}
+        isOpen={isRecommenderOpen}
+        onClose={() => setIsRecommenderOpen(false)}
+        competitorMediaUrl={ad.media_url}
+      />
     </aside>
   );
 };
