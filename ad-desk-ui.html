@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Desk | BrandMonk Ad Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--canvas:#F6F7F5;--surface:#fff;--ink:#1B2421;--muted:#5E6A66;--line:#DDE2DF;--accent:#0A7C6E;--accent-soft:#E0F1EE;--warn:#9A5A08;--warn-soft:#FBEFD9;box-sizing:border-box}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;height:100%}
+body{font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--canvas);color:var(--ink);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums;display:flex;flex-direction:column}
+button,select,input{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;margin-right:auto}
+.mark{width:28px;height:28px;border-radius:6px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:14px}
+.src{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.src i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.btn,select,input[type=text]{height:38px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:0 12px}
+.btn{font-weight:600}.btn:hover{border-color:#B7C1BD}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.btn.pri:hover{background:#086659}
+.shell{flex:1;min-height:0;display:grid;grid-template-columns:248px minmax(0,1fr) 410px}
+.rail,.pane{background:var(--surface);overflow-y:auto}
+.rail{border-right:1px solid var(--line);padding:18px 16px}
+.pane{border-left:1px solid var(--line);display:flex;flex-direction:column}
+.wall{overflow-y:auto;padding:22px 26px 40px}
+h2{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px}
+.co{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.co:first-of-type{border-top:0}
+.co input{margin-top:4px;accent-color:var(--accent);width:16px;height:16px}
+.co b{display:block;font-weight:600;line-height:1.3}.co span{font-size:13px;color:var(--muted)}
+.chip{display:inline-block;padding:1px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--accent-soft);color:var(--accent)}
+.chip.w{background:var(--warn-soft);color:var(--warn)}
+.add{display:flex;gap:8px;margin-top:14px}.add input{flex:1;min-width:0}
+.read{border-left:3px solid var(--accent);padding:2px 0 2px 14px;margin:0 0 20px;max-width:72ch}
+.read p{margin:0 0 4px}.read p:first-child{font-weight:600;font-size:17px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.bar .sp{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.fl{height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-weight:600}
+.fl[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.cnt{width:100%;font-size:13px;color:var(--muted);margin:2px 0 0}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:18px}
+.tile{background:none;border:0;padding:0;text-align:left;border-radius:8px}
+.tile .poster{outline:2px solid transparent;outline-offset:3px}
+.tile[aria-pressed=true] .poster{outline-color:var(--accent)}
+.tile b{display:block;margin-top:8px;font-weight:600;line-height:1.3}
+.tile span{font-size:13px;color:var(--muted)}
+.rl{height:4px;border-radius:2px;background:var(--line);margin:5px 0 3px;overflow:hidden}.rl i{display:block;height:100%;background:var(--accent)}
+.poster{font-size:12px;aspect-ratio:4/5;background:var(--bg);color:var(--fg);border-radius:6px;padding:1.4em;display:flex;flex-direction:column;justify-content:flex-end;gap:.5em;position:relative;overflow:hidden;width:100%}
+.poster::after{content:"";position:absolute;right:-2.5em;top:-2.5em;width:8em;height:8em;border-radius:50%;background:var(--ac);opacity:.9}
+.poster>*{position:relative;z-index:1}
+.pt{font-size:.78em;font-weight:600;background:var(--fg);color:var(--bg);padding:.2em .6em;border-radius:3px;align-self:flex-start;margin-bottom:auto}
+.poster h4{margin:0;font-size:1.55em;line-height:1.12;font-weight:700}
+.poster p{margin:0;font-size:.85em;opacity:.85;line-height:1.35}
+.pc{align-self:flex-start;margin-top:.4em;font-size:.85em;font-weight:700;background:var(--ac);color:var(--bg);padding:.4em .9em;border-radius:4px}
+.ph{display:flex;align-items:center;gap:4px;padding:0 16px;border-bottom:1px solid var(--line);flex:none}
+.ph .bk{display:none;margin-right:6px}
+.ph button.t{border:0;background:none;padding:14px 12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.ph button.t[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+.pb{flex:1;overflow-y:auto;padding:18px 20px}
+.pf{flex:none;padding:14px 20px;border-top:1px solid var(--line);background:var(--surface)}
+.pf .btn{width:100%}
+.pb h3{margin:0;font-size:18px;line-height:1.3}.sub{margin:2px 0 14px;color:var(--muted);font-size:13px}
+.pb .poster{font-size:13px;max-width:210px;margin-bottom:16px}
+.verdict{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-block:1px solid var(--line);margin-bottom:14px}
+.verdict b{font-size:34px;line-height:1;color:var(--accent);font-weight:700}
+.verdict small{display:block;font-size:12px;color:var(--muted)}
+.verdict p{margin:0;max-width:56ch}
+dl.k{margin:0}dl.k dt{font-size:13px;color:var(--muted);font-weight:600;margin-top:12px}dl.k dd{margin:1px 0 0;max-width:60ch}
+.tg{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+.fld{margin-bottom:14px}.fld label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:5px}.fld select{width:100%}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.pr{background:var(--canvas);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:14px;line-height:1.6;margin:0 0 12px;max-width:62ch}
+.cs{display:grid;grid-template-columns:78px 1fr;gap:4px 10px;font-size:14px;margin:0 0 14px}.cs dt{color:var(--muted)}.cs dd{margin:0;font-weight:600}
+.pv{background:var(--canvas);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;justify-content:center;margin-bottom:12px}
+.pv .poster{max-width:230px;aspect-ratio:1/1;font-size:12px}.pv .poster.feed{aspect-ratio:4/5}.pv .poster.story{aspect-ratio:9/16;max-width:150px;font-size:9px}
+.row{display:flex;gap:8px;flex-wrap:wrap}.note{font-size:13px;color:var(--muted);margin:8px 0 0}
+.empty{grid-column:1/-1;padding:40px 0;color:var(--muted)}
+.nv{flex:1;overflow-y:auto;padding:26px 32px 60px}
+.nv>div{max-width:920px;margin:0 auto}
+.nv h1{font-size:24px;margin:0 0 6px;line-height:1.25}.nv>div>p{margin:0 0 24px;color:var(--muted);max-width:68ch}
+.nv section{margin-bottom:28px}.nv h2{font-size:16px;color:var(--ink);padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:0}
+.rw{display:grid;grid-template-columns:200px 1fr;gap:4px 24px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rw b{font-weight:600;display:flex;gap:8px;align-items:flex-start}.rw p{margin:0;max-width:66ch}.rw p em{font-style:normal;font-weight:600}
+.sw{width:18px;height:18px;border-radius:4px;border:1px solid var(--line);flex:none;margin-top:3px}
+[hidden]{display:none!important}
+@media (max-width:1100px){
+ body{display:block;height:auto}.shell{display:block}.top{position:sticky;top:0;z-index:5;flex-wrap:wrap;height:auto;padding:10px 14px}.src{display:none}
+ .rail{border:0;border-bottom:1px solid var(--line);padding:12px 14px;display:flex;gap:6px 14px;overflow-x:auto;overflow-y:hidden;align-items:center}
+ .rail h2,.add{display:none}.co{border:0;padding:4px 0;flex:none}.co span{display:none}
+ .wall{padding:16px 14px 40px;overflow:visible}
+ .pane{position:fixed;inset:0;z-index:10;border:0;transform:translateX(100%);visibility:hidden;transition:transform .2s,visibility .2s}
+ .pane.open{transform:none;visibility:visible}.ph .bk{display:inline-block}
+ .rw{grid-template-columns:1fr}.nv{padding:20px 14px 60px}}
+@media (prefers-reduced-motion:reduce){.pane{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+ <div class="brand"><span class="mark">B</span>Ad Desk</div>
+ <span class="src" role="status"><i></i>All 3 ad sources responding</span>
+ <select aria-label="City"><option>Coimbatore</option><option>Kochi</option><option>Bengaluru</option></select>
+ <button class="btn" id="nb">Design notes</button>
+ <button class="btn pri">Refresh ads</button>
+</header>
+
+<div class="shell" id="work">
+ <aside class="rail" aria-label="Competitors">
+  <h2>Competitors to watch</h2><div id="rail" style="display:contents"></div>
+  <form class="add" onsubmit="return false"><input type="text" placeholder="Institute or Page link" aria-label="Add a competitor"><button class="btn">Add</button></form>
+ </aside>
+
+ <main class="wall">
+  <div class="read">
+   <p>Most ads promise a result with a deadline.</p>
+   <p>38% of active ads use it. UI/UX has the fewest ads in Coimbatore, which leaves room for BrandMonk.</p>
+  </div>
+  <div class="bar" id="bar">
+   <button class="fl" data-c="All" aria-pressed="true">All courses</button><button class="fl" data-c="AI" aria-pressed="false">AI</button><button class="fl" data-c="Digital marketing" aria-pressed="false">Digital marketing</button><button class="fl" data-c="UI/UX" aria-pressed="false">UI/UX</button>
+   <div class="sp"><label for="so">Sort by</label><select id="so"><option value="days">Longest running</option><option value="score">Highest score</option><option value="new">Newest</option></select></div>
+   <p class="cnt" id="cnt" role="status"></p>
+  </div>
+  <div class="gal" id="gal"></div>
+ </main>
+
+ <aside class="pane" id="pane" aria-label="Ad details"></aside>
+</div>
+
+<div class="nv" id="nv" hidden><div id="nvc"></div></div>
+
+<script>
+const ads=[
+{id:0,co:"Nexora Academy",course:"AI",days:87,bg:"#12324F",fg:"#fff",ac:"#F2B84B",tag:"Placement support",head:"Learn AI. Get hired in 90 days.",sub:"Python, machine learning and live projects",cta:"Enroll now",plat:"Facebook and Instagram",hook:"Outcome promise with a deadline",offer:"Free demo class and placement assistance",aud:"Graduates and career switchers, 20 to 28",tac:["Fixed timeline","Placement promise","Free trial"],why:"It promises a concrete result in a fixed time, and the free demo lowers the risk of saying yes.",weak:"No proof such as student names or salaries.",score:86},
+{id:1,co:"Growth Lab",course:"Digital marketing",days:54,bg:"#E3F3EC",fg:"#0E3B2E",ac:"#17795A",tag:"Agency mentors",head:"Run ads that pay for themselves",sub:"Google, Meta and SEO, taught by agency leads",cta:"Book a seat",plat:"Instagram",hook:"Practical skill with a money outcome",offer:"Live campaign budget during the course",aud:"Business owners and marketing juniors",tac:["Hands-on proof","Expert authority"],why:"It sells what the skill earns, not the syllabus. Live budgets make the course feel real.",weak:"Fees and batch dates are not mentioned.",score:78},
+{id:2,co:"Lumen Design School",course:"UI/UX",days:31,bg:"#2B1E5C",fg:"#fff",ac:"#FF8A5B",tag:"Portfolio first",head:"Design apps people love",sub:"Figma to portfolio in 12 weeks",cta:"View syllabus",plat:"Facebook and Instagram",hook:"Tangible deliverable",offer:"Three portfolio projects",aud:"Design-curious students and freshers",tac:["Clear deliverable","Mentor reviews"],why:"Hiring managers ask for a portfolio, so naming it as the outcome answers the main worry.",weak:"The visual looks like most design schools.",score:72},
+{id:3,co:"CodeBridge Institute",course:"AI",days:22,bg:"#FFD84D",fg:"#1A1A1A",ac:"#1A1A1A",tag:"Weekend batches",head:"AI course. Fees from ₹9,999",sub:"Weekend batches in Coimbatore",cta:"Call today",plat:"Facebook",hook:"Price anchor",offer:"Fees from ₹9,999",aud:"Working professionals and students on a budget",tac:["Price anchor","Scarcity","Local relevance"],why:"A low starting price stops the scroll, and weekends remove the time objection.",weak:"Competes on price only, which weakens trust.",score:69},
+{id:4,co:"Pixel & Pen Institute",course:"UI/UX",days:12,bg:"#E9F0FF",fg:"#14284B",ac:"#3B5BDB",tag:"Mentor reviews",head:"Your first UX job starts here",sub:"Every project reviewed by a working designer",cta:"Join the batch",plat:"Instagram",hook:"Career entry promise",offer:"Mentor review on every project",aud:"Freshers looking for a first design role",tac:["Career promise","Personal feedback"],why:"It speaks to first-job anxiety and backs the promise with personal feedback.",weak:"No dates, fees or batch size.",score:74},
+{id:5,co:"Skillhub Tech",course:"Digital marketing",days:9,bg:"#FCE4E4",fg:"#5A1414",ac:"#D64545",tag:"Limited seats",head:"Limited seats. Digital marketing batch",sub:"Starts 15 November",cta:"Reserve seat",plat:"Facebook and Instagram",hook:"Scarcity with a date",offer:"Batch capped at 20 seats",aud:"Job seekers and career switchers",tac:["Scarcity","Fixed start date"],why:"A real date and a seat cap make the decision feel time-bound without a discount.",weak:"Says little about what students learn.",score:66}];
+const comps=[["Nexora Academy","AI",14,0],["Growth Lab","Digital marketing",11,0],["Lumen Design School","UI/UX",9,0],["CodeBridge Institute","AI",12,0],["Pixel & Pen Institute","UI/UX",8,1],["Skillhub Tech","Digital marketing",8,0]];
+const V=[{n:"Outcome",s:"a clear result promised in a fixed time",l:"bold headline top-left, one calm illustration of a learner at a laptop, empty band at the bottom for a button",h:{AI:"Build real AI projects in 12 weeks","Digital marketing":"Launch your first paid campaign by week 3","UI/UX":"Go from Figma basics to a hiring-ready portfolio"},b:"Small batches, live mentors, weekly reviews"},
+{n:"Proof",s:"trust built through mentors and reviewed work",l:"split composition with a mentor portrait area on the right and a clean text zone on the left",h:{AI:"Learn AI from engineers who ship it","Digital marketing":"Learn marketing from people who run ad budgets","UI/UX":"Every design project reviewed by a working designer"},b:"Industry mentors on every batch"},
+{n:"Urgency",s:"a real start date and a limited seat count",l:"strong colour block with a large date badge in the corner and minimal imagery",h:{AI:"AI batch starts soon. Seats are limited","Digital marketing":"Digital marketing batch is filling fast","UI/UX":"New UI/UX batch. Few seats left"},b:"Next batch starts in 2 weeks"}];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+let sel=0,mode="a",course="All",sort="days",vi=0,size="",pc="AI",on=new Set(comps.map(c=>c[0]));
+const P=a=>`<div class="poster" style="--bg:${a.bg};--fg:${a.fg};--ac:${a.ac}"><span class="pt">${a.tag}</span><h4>${a.head}</h4><p>${a.sub}</p><span class="pc">${a.cta}</span></div>`;
+const vis=()=>ads.filter(a=>on.has(a.co)&&(course=="All"||a.course==course)).sort((x,y)=>sort=="days"?y.days-x.days:sort=="score"?y.score-x.score:x.days-y.days);
+function rail(){$("#rail").innerHTML=comps.map((c,i)=>`<label class="co"><input type="checkbox" data-i="${i}" ${on.has(c[0])?"checked":""}><div><b>${c[0]}</b><span>${c[1]}, ${c[2]} active ads</span>${c[3]?' <span class="chip w">Needs review</span>':""}</div></label>`).join("")}
+function wall(){const v=vis();if(!v.find(a=>a.id==sel)&&v.length)sel=v[0].id;
+$("#cnt").textContent=`${v.length} ads from ${new Set(v.map(a=>a.co)).size} competitors`;
+$("#gal").innerHTML=v.length?v.map(a=>`<button class="tile" data-id="${a.id}" aria-pressed="${a.id==sel}">${P(a)}<b>${a.co}</b><div class="rl"><i style="width:${Math.min(100,a.days/90*100)}%"></i></div><span>Running ${a.days} days</span></button>`).join(""):`<p class="empty">No ads match these filters. Select more competitors or choose All courses.</p>`}
+function pane(){const a=ads[sel],h=`<div class="ph"><button class="btn bk" id="bk" aria-label="Back to ads">Back</button><div role="tablist" style="display:flex;gap:4px"><button class="t" role="tab" data-m="a" aria-selected="${mode=="a"}">Analysis</button><button class="t" role="tab" data-m="p" aria-selected="${mode=="p"}">Poster for BrandMonk</button></div></div>`;
+if(mode=="a"){$("#pane").innerHTML=h+`<div class="pb"><h3>${a.co}</h3><p class="sub">${a.course}, running ${a.days} days on ${a.plat}</p>${P(a)}
+<div class="verdict"><div><b>${a.score}</b><small>out of 100</small></div><p>${a.why}</p></div>
+<dl class="k"><dt>Hook</dt><dd>${a.hook}</dd><dt>Offer</dt><dd>${a.offer}</dd><dt>Audience</dt><dd>${a.aud}</dd><dt>Tactics</dt><dd><div class="tg">${a.tac.map(t=>`<span class="chip">${t}</span>`).join("")}</div></dd><dt>Weak spot BrandMonk can use</dt><dd>${a.weak}</dd></dl></div>
+<div class="pf"><button class="btn pri" data-m="p">Create BrandMonk poster from this ad</button></div>`}
+else{const v=V[vi],hd=v.h[pc],nm=size||"square";$("#pane").innerHTML=h+`<div class="pb"><h3>Poster from ${a.co}’s strategy</h3><p class="sub">Idea taken: ${a.hook.toLowerCase()}</p>
+<div class="fld"><label for="pc">BrandMonk course</label><select id="pc">${["AI","Digital marketing","UI/UX"].map(c=>`<option ${c==pc?"selected":""}>${c}</option>`).join("")}</select></div>
+<div class="fld"><label>Angle</label><div class="seg">${V.map((x,i)=>`<button class="fl" data-v="${i}" aria-pressed="${i==vi}">${x.n}</button>`).join("")}</div></div>
+<div class="fld"><label>Size</label><div class="seg">${[["","Square"],["feed","Feed"],["story","Story"]].map(s=>`<button class="fl" data-s="${s[0]}" aria-pressed="${s[0]==size}">${s[1]}</button>`).join("")}</div></div>
+<div class="pv"><div class="poster ${size}" style="--bg:#16202E;--fg:#fff;--ac:#1F4FD8"><span class="pt">BrandMonk Academy</span><h4>${hd}</h4><p>${v.b}</p><span class="pc" style="color:#fff">Book a free demo</span></div></div>
+<dl class="cs"><dt>Headline</dt><dd>${hd}</dd><dt>Subline</dt><dd>${v.b}</dd><dt>Button</dt><dd>Book a free demo</dd></dl>
+<h2>Image prompt</h2><p class="pr" id="pp">Social media poster, ${nm} format, for BrandMonk Academy’s ${pc} course. Strategy: ${v.s}, inspired by a competitor ad built on “${a.hook.toLowerCase()}”. Composition: ${v.l}. Palette: navy #16202E, blue #1F4FD8 and sun #F2B84B on white. Mood: confident and professional, for students and young professionals in South India. Leave clean space for text and logo. Draw no lettering in the image.</p>
+<p class="note">Text and logo are added afterwards from the brand template, so the image stays clean.</p></div>
+<div class="pf"><div class="row"><button class="btn" id="cb" style="flex:1">Copy prompt</button><button class="btn pri" id="rb" style="flex:1">Render poster</button></div><p class="note" id="st" role="status"></p></div>`}}
+const all=()=>{rail();wall();pane()};all();
+$("#rail").onchange=e=>{const c=comps[+e.target.dataset.i][0];e.target.checked?on.add(c):on.delete(c);wall();pane()};
+$("#bar").onclick=e=>{const b=e.target.closest("[data-c]");if(!b)return;course=b.dataset.c;$$("#bar [data-c]").forEach(x=>x.setAttribute("aria-pressed",x==b));wall();pane()};
+$("#so").onchange=e=>{sort=e.target.value;wall()};
+$("#gal").onclick=e=>{const t=e.target.closest("[data-id]");if(!t)return;sel=+t.dataset.id;wall();pane();$("#pane").classList.add("open")};
+$("#pane").onclick=e=>{const m=e.target.closest("[data-m]"),v=e.target.closest("[data-v]"),s=e.target.closest("[data-s]");
+if(m){mode=m.dataset.m;pane()}else if(v){vi=+v.dataset.v;pane()}else if(s){size=s.dataset.s;pane()}
+else if(e.target.id=="bk")$("#pane").classList.remove("open");
+else if(e.target.id=="cb"){navigator.clipboard?.writeText($("#pp").textContent);$("#st").textContent="Prompt copied."}
+else if(e.target.id=="rb"){$("#st").textContent="Rendering background...";setTimeout(()=>{const x=$("#st");if(x)x.textContent="Background ready. Text and logo added from the brand template."},900)}};
+$("#pane").onchange=e=>{if(e.target.id=="pc"){pc=e.target.value;pane()}};
+document.addEventListener("keydown",e=>{if(e.key=="Escape")$("#pane").classList.remove("open");
+if(/SELECT|INPUT|TEXTAREA/.test(e.target.tagName)||$("#work").hidden)return;
+const k=e.key,n=["ArrowDown","ArrowRight","j"].includes(k)?1:["ArrowUp","ArrowLeft","k"].includes(k)?-1:0;if(!n)return;
+const v=vis(),i=v.findIndex(a=>a.id==sel),t=v[i+n];if(t){e.preventDefault();sel=t.id;wall();pane();$(`[data-id="${sel}"]`)?.focus()}});
+const R=[
+["Concept",[["Ad Desk, a three-pane workspace","Choose competitors on the left, scan their ads in the middle, decide and create on the right. The screen reads in the same order as the job: who to watch, what they run, what BrandMonk should make. Nothing opens in a new page, so context is never lost."]]],
+["Colour",[
+["Canvas #F6F7F5","A very light green-grey instead of pure white. It cuts glare during long scanning sessions and lets white panels look raised without shadows.","#F6F7F5"],
+["Surface #FFFFFF","Ads are judged against a neutral ground. White keeps competitor colours true, which matters when you study their palettes.","#FFFFFF"],
+["Ink #1B2421","A tinted dark with about 15 to 1 contrast on white. It is softer than pure black and still passes the strictest accessibility level.","#1B2421"],
+["Muted #5E6A66","Secondary text at roughly 5.6 to 1 contrast, which passes AA, so small labels stay readable on a phone in daylight.","#5E6A66"],
+["Accent teal #0A7C6E","Meta’s own interface is blue, so a teal tool is never mistaken for the platform whose ads we study. Teal also reads as growth and go, which fits a marketing academy. It is used only for selection, the main action and scores, so the eye learns that teal means act here.","#0A7C6E"],
+["Amber #9A5A08","Reserved for cautions such as a competitor that needs review. It is always paired with a text label, so meaning never depends on colour alone.","#9A5A08"],
+["Brand kit kept separate","The poster preview uses BrandMonk’s navy, blue and sun, not the tool’s teal, so the tool’s chrome never tints the result you will publish.","#16202E"],
+["Avoided: gradients and dark mode","Gradients add noise that competes with the ads. Dark mode misjudges ad colours, and posters are seen in daylight, so it can wait."]]],
+["Typography",[
+["Public Sans, one family","Designed for readability with open letter shapes. Its digits are tabular, so days and scores line up. One family keeps the interface neutral, so the ads supply the personality, and it loads faster than two fonts."],
+["Scale 13, 15, 18, 24","Roughly a 1.2 step. Labels are 13, body 15, titles 18, page title 24, and only three weights (400, 600, 700) are used so hierarchy is clear without clutter."],
+["Sentence case, no all caps","Mixed case is faster to read. Lines in the detail pane stay under 65 characters for comfortable reading."]]],
+["Layout and flow",[
+["Ads are the hero","The ad wall gets all remaining width, and the surrounding chrome stays narrow. Tiles use the 4 to 5 ratio of Instagram feed ads, so each creative is seen the way its audience sees it."],
+["Longest running first","An advertiser stops paying for ads that do not work, so running time is the best free performance signal. Each tile shows a run-length bar, so you see it without reading."],
+["Persistent detail pane","Studying ads means opening many in a row. A pop-up costs two clicks per ad, a pane costs one. Arrow keys or J and K also move through ads."],
+["First ad pre-selected","The pane is never empty, so the screen always shows something useful."],
+["Verdict first, evidence next","The score and one-line reason come before the breakdown. People decide first and check details second."],
+["Market read in sentences","A plain statement above the wall gives the main finding in five seconds. Marketers act on statements, and a chart would add a step."],
+["Sticky next step","The main action stays at the bottom of the pane, so what to do next is always visible."]]],
+["Interaction and feedback",[
+["Instant filters","Ticking a competitor or choosing a course updates the wall at once, with a count of what is showing."],
+["Feedback where you look","Messages such as Prompt copied appear next to the button instead of in a pop-up toast."],
+["Honest source status","The top bar says how many ad sources are responding, in words and not only a coloured dot, so a partial failure is never hidden."],
+["Phone layout","Competitors become a scrolling strip and the detail pane becomes a full screen with a Back button."]]],
+["Writing and accessibility",[
+["Plain, outcome-led labels","Buttons say what happens, such as Create BrandMonk poster from this ad. Empty states say what to try next."],
+["No emoji","They render differently on each device and read as casual. Text and consistent shapes are clearer and work well with screen readers."],
+["Accessible by default","Visible 2px teal focus ring, full keyboard use, labelled controls, pressed and selected states announced, reduced motion respected, and tap targets of 34px or more."]]]];
+$("#nvc").innerHTML=`<h1>Design notes</h1><p>Every choice in Ad Desk has a reason tied to the job: finding what competitors run and turning it into a better poster. This page lists each decision and why.</p>`+R.map(s=>`<section><h2>${s[0]}</h2>${s[1].map(r=>`<div class="rw"><b>${r[2]?`<span class="sw" style="background:${r[2]}"></span>`:""}${r[0]}</b><p>${r[1]}</p></div>`).join("")}</section>`).join("");
+$("#nb").onclick=()=>{const h=$("#nv").hidden;$("#nv").hidden=!h;$("#work").hidden=h;$("#nb").textContent=h?"Back to workspace":"Design notes";window.scrollTo(0,0)};
+</script>
+</body>
+</html>
