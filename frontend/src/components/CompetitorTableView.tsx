@@ -1,6 +1,11 @@
 import React, { useState } from "react";
-import { analyzeCompetitorWeaknesses, fetchCompetitorWeaknesses, importEvidence } from "../api/client";
-import { Competitor, WeaknessItem } from "../types";
+import {
+  analyzeCompetitorWeaknesses,
+  fetchAds,
+  fetchCompetitorWeaknesses,
+  importEvidence,
+} from "../api/client";
+import { Ad, Competitor, WeaknessItem } from "../types";
 
 interface CompetitorTableViewProps {
   competitors: Competitor[];
@@ -14,6 +19,9 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
   onRefreshCompetitors,
 }) => {
   const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<"ads" | "weaknesses">("ads");
+  const [competitorAds, setCompetitorAds] = useState<Ad[]>([]);
+  const [isLoadingAds, setIsLoadingAds] = useState(false);
   const [weaknesses, setWeaknesses] = useState<WeaknessItem[]>([]);
   const [isLoadingWeakness, setIsLoadingWeakness] = useState(false);
   const [weaknessError, setWeaknessError] = useState("");
@@ -31,14 +39,25 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
   const [filterHasAds, setFilterHasAds] = useState<"all" | "yes" | "no">("all");
   const [sortBy, setSortBy] = useState<"ads" | "distance" | "weakness" | "name">("ads");
 
-  const handleInspectWeaknesses = async (comp: Competitor) => {
+  const handleInspectCompetitor = async (comp: Competitor, tab: "ads" | "weaknesses" = "ads") => {
     setSelectedCompId(comp.id);
+    setDetailTab(tab);
+    setIsLoadingAds(true);
     setIsLoadingWeakness(true);
     setWeaknessError("");
+
+    try {
+      const ads = await fetchAds({ competitorIds: [comp.id] });
+      setCompetitorAds(ads);
+    } catch {
+      setCompetitorAds([]);
+    } finally {
+      setIsLoadingAds(false);
+    }
+
     try {
       const res = await fetchCompetitorWeaknesses(comp.id);
       if (res.weaknesses.length === 0 && res.is_sufficient) {
-        // Run analysis on demand if sufficient
         const analyzed = await analyzeCompetitorWeaknesses(comp.id);
         setWeaknesses(analyzed);
       } else {
@@ -178,10 +197,21 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
               const isReady = comp.active_ads_count >= 3 || comp.data_status === "analyzed";
               return (
                 <tr key={comp.id} style={{ borderBottom: "1px solid var(--line)" }}>
-                  <td style={{ padding: "12px 14px", fontWeight: 600 }}>{comp.name}</td>
+                  <td style={{ padding: "12px 14px", fontWeight: 600 }}>
+                    <a
+                      href="#inspect"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleInspectCompetitor(comp, "ads");
+                      }}
+                      style={{ color: "var(--ink)", textDecoration: "none", borderBottom: "1px dashed var(--line)" }}
+                    >
+                      {comp.name}
+                    </a>
+                  </td>
                   <td style={{ padding: "12px 14px" }}>{comp.course}</td>
                   <td style={{ padding: "12px 14px", color: "var(--muted)" }}>
-                    {comp.city} {comp.distance_km ? `(${comp.distance_km} km)` : ""}
+                    {comp.city} {comp.area ? `· ${comp.area}` : ""} {comp.distance_km ? `(${comp.distance_km} km)` : ""}
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <b>{comp.active_ads_count}</b> ads
@@ -215,9 +245,9 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
                       <button
                         className="btn"
                         style={{ fontSize: 12, padding: "3px 8px" }}
-                        onClick={() => handleInspectWeaknesses(comp)}
+                        onClick={() => handleInspectCompetitor(comp, "ads")}
                       >
-                        Weaknesses
+                        Inspect & Ads
                       </button>
                       <button
                         className="btn"
@@ -235,41 +265,174 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
         </table>
       </div>
 
-      {/* Weakness Details Drawer / Panel */}
+      {/* Competitor Comprehensive Details Panel */}
       {selectedComp && (
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 16 }}>
-              Weakness Analysis: <u>{selectedComp.name}</u>
-            </h3>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 20 }}>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <h3 style={{ margin: 0, fontSize: 17 }}>{selectedComp.name}</h3>
+                <span className="chip" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                  {selectedComp.course}
+                </span>
+                <span className="chip" style={{ background: "var(--canvas)", color: "var(--muted)" }}>
+                  {selectedComp.city} {selectedComp.area ? `· ${selectedComp.area}` : ""}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", gap: 12 }}>
+                {selectedComp.website && (
+                  <a href={selectedComp.website} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+                    Website
+                  </a>
+                )}
+                {selectedComp.fb_page_id && (
+                  <span>Meta Page ID: <code>{selectedComp.fb_page_id}</code></span>
+                )}
+                {selectedComp.ig_handle && (
+                  <span>Instagram: @{selectedComp.ig_handle}</span>
+                )}
+              </div>
+            </div>
             <button className="btn" onClick={() => setSelectedCompId(null)}>
               Close
             </button>
           </div>
 
-          {isLoadingWeakness ? (
-            <p style={{ color: "var(--muted)" }}>Checking data sufficiency and analyzing evidence...</p>
-          ) : weaknessError ? (
-            <div style={{ padding: 10, background: "var(--warn-soft)", borderRadius: 6, color: "var(--warn)", fontSize: 13 }}>
-              {weaknessError}
-            </div>
-          ) : weaknesses.length === 0 ? (
-            <p style={{ color: "var(--muted)", fontSize: 13 }}>
-              No weaknesses analyzed yet. Collect more ads or add public customer review evidence.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {weaknesses.map((w) => (
-                <div key={w.id} style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <b>{w.category.replace("_", " ").toUpperCase()}</b>
-                    <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                      Severity {w.severity}/5 | {w.evidence_count} evidence items ({w.share_percent}%) | Confidence: {w.confidence}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14 }}>{w.summary}</div>
+          {/* Tab selector */}
+          <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--line)", paddingBottom: 10, marginBottom: 16 }}>
+            <button
+              className="fl"
+              aria-pressed={detailTab === "ads"}
+              onClick={() => setDetailTab("ads")}
+              style={{ fontSize: 13, padding: "5px 12px" }}
+            >
+              Active Running Ads ({competitorAds.length})
+            </button>
+            <button
+              className="fl"
+              aria-pressed={detailTab === "weaknesses"}
+              onClick={() => setDetailTab("weaknesses")}
+              style={{ fontSize: 13, padding: "5px 12px" }}
+            >
+              Weakness Analysis ({weaknesses.length})
+            </button>
+          </div>
+
+          {/* Tab 1: Running Ads */}
+          {detailTab === "ads" && (
+            <div>
+              {isLoadingAds ? (
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>Loading active running ads...</p>
+              ) : competitorAds.length === 0 ? (
+                <div style={{ padding: 18, background: "var(--canvas)", borderRadius: 6, fontSize: 13, color: "var(--muted)" }}>
+                  No active ads collected for this competitor yet. Click <b>Refresh ads</b> in the top bar to fetch from Meta Ad Library, or add a Meta Ad Library URL.
                 </div>
-              ))}
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                  {competitorAds.map((ad) => (
+                    <div
+                      key={ad.id}
+                      style={{
+                        background: "var(--canvas)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {ad.media_url ? (
+                        <img
+                          src={ad.media_url}
+                          alt="Creative preview"
+                          style={{ width: "100%", height: 160, objectFit: "cover" }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            height: 100,
+                            background: "var(--surface)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "var(--muted)",
+                            fontSize: 12,
+                          }}
+                        >
+                          Ad Creative Card
+                        </div>
+                      )}
+                      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span className="chip" style={{ fontSize: 11, background: "var(--accent-soft)", color: "var(--accent)" }}>
+                            Running for {ad.run_days} days
+                          </span>
+                          {ad.cta && (
+                            <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>
+                              CTA: {ad.cta}
+                            </span>
+                          )}
+                        </div>
+
+                        {ad.headline && (
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{ad.headline}</div>
+                        )}
+
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--ink)",
+                            lineHeight: 1.4,
+                            maxHeight: 70,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {ad.copy}
+                        </div>
+
+                        {ad.hook && (
+                          <div style={{ marginTop: "auto", fontSize: 11, color: "var(--muted)", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+                            <strong>Hook:</strong> {ad.hook}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Weaknesses */}
+          {detailTab === "weaknesses" && (
+            <div>
+              {isLoadingWeakness ? (
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>Checking data sufficiency and analyzing evidence...</p>
+              ) : weaknessError ? (
+                <div style={{ padding: 10, background: "var(--warn-soft)", borderRadius: 6, color: "var(--warn)", fontSize: 13 }}>
+                  {weaknessError}
+                </div>
+              ) : weaknesses.length === 0 ? (
+                <p style={{ color: "var(--muted)", fontSize: 13 }}>
+                  No weaknesses analyzed yet. Collect more ads or add public customer review evidence.
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {weaknesses.map((w) => (
+                    <div key={w.id} style={{ padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <b>{w.category.replace("_", " ").toUpperCase()}</b>
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                          Severity {w.severity}/5 | {w.evidence_count} evidence items ({w.share_percent}%) | Confidence: {w.confidence}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 14 }}>{w.summary}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

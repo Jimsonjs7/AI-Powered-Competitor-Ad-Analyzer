@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { startDiscovery } from "../api/client";
+import { DiscoveryModal } from "./DiscoveryModal";
 
 interface TopBarProps {
   currentView: "wall" | "competitors" | "opportunities" | "profile" | "notes";
@@ -22,23 +22,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   isRefreshing,
   completenessScore,
 }) => {
-  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
   const [discoveryMsg, setDiscoveryMsg] = useState("");
-
-  const handleStartDiscovery = async () => {
-    setIsDiscovering(true);
-    setDiscoveryMsg("Starting discovery agent...");
-    try {
-      const res = await startDiscovery(15.0);
-      setDiscoveryMsg(`Agent started (Run #${res.run_id})`);
-      setTimeout(() => setDiscoveryMsg(""), 4000);
-    } catch (err) {
-      setDiscoveryMsg("Discovery failed to start.");
-      setTimeout(() => setDiscoveryMsg(""), 3000);
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
 
   return (
     <header className="top" style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 18px", borderBottom: "1px solid var(--line)", background: "var(--surface)" }}>
@@ -115,11 +100,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           className="btn"
-          disabled={isDiscovering}
-          onClick={handleStartDiscovery}
+          onClick={() => setIsDiscoveryModalOpen(true)}
           style={{ fontSize: 13 }}
         >
-          {isDiscovering ? "Discovering..." : "Find competitors"}
+          Find competitors
         </button>
 
         <button
@@ -131,6 +115,19 @@ export const TopBar: React.FC<TopBarProps> = ({
           {isRefreshing ? "Refreshing..." : "Refresh ads"}
         </button>
       </div>
+
+      <DiscoveryModal
+        isOpen={isDiscoveryModalOpen}
+        onClose={() => setIsDiscoveryModalOpen(false)}
+        defaultCity={selectedCity}
+        onDiscoveryStarted={() => {
+          setDiscoveryMsg("Discovery scan launched.");
+          setTimeout(() => setDiscoveryMsg(""), 4000);
+        }}
+        onCompetitorAdded={() => {
+          onRefreshAds();
+        }}
+      />
     </header>
   );
 };

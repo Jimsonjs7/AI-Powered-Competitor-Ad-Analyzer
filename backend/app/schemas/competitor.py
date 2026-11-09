@@ -98,3 +98,20 @@ class PageResolveResponse(BaseModel):
     resolved_page_id: Optional[str]
     confidence: ConfidenceLevel
     source: str
+
+
+class CompetitorCrawlRequest(BaseModel):
+    website_url: str = Field(..., description="Competitor website URL to crawl and extract details from")
+
+
+class CompetitorCrawlResponse(BaseModel):
+    name: str
+    course: str = "Digital marketing"
+    city: str = "Coimbatore"
+    area: Optional[str] = None
+    website: str
+    fb_page_id: Optional[str] = None
+    fb_url: Optional[str] = None
+    ig_handle: Optional[str] = None
+    description: Optional[str] = None
+    detected_social_links: list[str] = []

@@ -2,6 +2,7 @@ import {
   Ad,
   BusinessProfile,
   Competitor,
+  CompetitorCrawlResult,
   DataSufficiency,
   DiscoveryRunResponse,
   DiscoveryStatus,
@@ -182,13 +183,29 @@ export async function autofillProfile(websiteUrl: string) {
 }
 
 // Phase B: Discovery APIs
-export async function startDiscovery(radiusKm: number = 10.0): Promise<DiscoveryRunResponse> {
+export async function startDiscovery(payload?: {
+  radius_km?: number;
+  city?: string;
+  areas?: string[];
+  domains?: string[];
+  search_terms?: string[];
+}): Promise<DiscoveryRunResponse> {
   const res = await fetch(`${API_BASE}/discovery/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ radius_km: radiusKm }),
+    body: JSON.stringify(payload || { radius_km: 10.0 }),
   });
   if (!res.ok) throw new Error("Failed to start discovery run");
+  return res.json();
+}
+
+export async function crawlCompetitorWebsite(websiteUrl: string): Promise<CompetitorCrawlResult> {
+  const res = await fetch(`${API_BASE}/competitors/crawl-website`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ website_url: websiteUrl }),
+  });
+  if (!res.ok) throw new Error("Failed to crawl competitor website");
   return res.json();
 }
 

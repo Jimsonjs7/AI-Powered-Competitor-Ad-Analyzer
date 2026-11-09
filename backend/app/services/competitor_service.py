@@ -1,12 +1,15 @@
 import re
 from urllib.parse import parse_qs, urlparse
 from typing import List, Optional
+import httpx
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.security import validate_target_url
 from app.models.competitor import Competitor
 from app.models.competitor_metrics import CompetitorMetrics
 from app.schemas.competitor import (
+    CompetitorCrawlResponse,
     CompetitorCreate,
     CompetitorDiscoverItem,
     CompetitorDiscoverRequest,
@@ -230,3 +233,95 @@ class CompetitorService:
         self.db.commit()
 
         return competitor
+
+    def crawl_competitor_website(self, website_url: str) -> CompetitorCrawlResponse:
+        safe_url = validate_target_url(website_url, check_whitelist=False)
+        name = "Competitor"
+        course = "Digital marketing"
+        city = "Coimbatore"
+        area = None
+        fb_page_id = None
+        fb_url = None
+        ig_handle = None
+        description = None
+        social_links = []
+
+        try:
+            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+                res = client.get(safe_url, headers={"User-Agent": "BrandMonk-CompetitorDiscovery/2.0"})
+                if res.status_code == 200:
+                    html = res.text
+
+                    # Extract title / name
+                    title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+                    if title_match:
+                        raw_title = title_match.group(1).strip()
+                        parts = [p.strip() for p in re.split(r"[-|–—:]", raw_title) if p.strip()]
+                        seo_indicators = ["best ", "top ", " agency in", " company in", " services in", " institute in", " training in", "academy in"]
+                        if len(parts) > 1 and any(ind in parts[0].lower() for ind in seo_indicators) and not any(ind in parts[-1].lower() for ind in seo_indicators):
+                            name = parts[-1]
+                        else:
+                            name = parts[0] if parts else raw_title
+
+                    # Extract description
+                    desc_match = re.search(r'<meta\s+name=["\']description["\']\s+content=["\'](.*?)["\']', html, re.IGNORECASE | re.DOTALL)
+                    if desc_match:
+                        description = desc_match.group(1).strip()
+
+                    combined = f"{raw_title if 'raw_title' in locals() else ''} {description or ''} {html[:5000]}"
+
+                    # Detect course / primary offer
+                    if re.search(r"\b(ai|artificial intelligence|machine learning|data science)\b", combined, re.IGNORECASE):
+                        course = "AI"
+                    elif re.search(r"\b(ui|ux|user interface|product design)\b", combined, re.IGNORECASE):
+                        course = "UI/UX"
+                    elif re.search(r"\b(full stack|web development|software)\b", combined, re.IGNORECASE):
+                        course = "Full Stack"
+                    else:
+                        course = "Digital marketing"
+
+                    # Detect city
+                    for city_cand in ["Coimbatore", "Chennai", "Bangalore", "Bengaluru", "Hyderabad", "Mumbai", "Delhi", "Kochi", "Madurai", "Trichy"]:
+                        if re.search(r"\b" + re.escape(city_cand) + r"\b", combined, re.IGNORECASE):
+                            city = city_cand
+                            break
+
+                    # Detect Coimbatore area / neighbourhood
+                    coimbatore_areas = ["Gandhipuram", "RS Puram", "Peelamedu", "Saravanampatti", "Hopes College", "Saibaba Colony", "Singanallur", "Ramanathapuram", "Vadavalli", "Ukkadam", "Kuniyamuthur", "Thudiyalur", "Ganapathy"]
+                    for a_cand in coimbatore_areas:
+                        if re.search(r"\b" + re.escape(a_cand) + r"\b", combined, re.IGNORECASE):
+                            area = a_cand
+                            break
+
+                    # Extract Facebook link & Page ID
+                    fb_match = re.search(r'href=["\'](https?://(?:www\.)?facebook\.com/[^"\']+)["\']', html, re.IGNORECASE)
+                    if fb_match:
+                        fb_url = fb_match.group(1)
+                        social_links.append(fb_url)
+                        resolved = self.resolve_page_id(fb_url)
+                        fb_page_id = resolved.resolved_page_id
+
+                    # Extract Instagram link
+                    ig_match = re.search(r'href=["\'](https?://(?:www\.)?instagram\.com/([^"\'/?]+)[^"\']*)["\']', html, re.IGNORECASE)
+                    if ig_match:
+                        social_links.append(ig_match.group(1))
+                        ig_handle = ig_match.group(2)
+
+                    # Extract other social links
+                    all_socials = re.findall(r'href=["\'](https?://(?:www\.)?(?:linkedin|youtube|twitter|x)\.com/[^"\']+)["\']', html, re.IGNORECASE)
+                    social_links.extend(all_socials)
+        except Exception as e:
+            logger.warning(f"Competitor crawl failed for {safe_url}: {e}")
+
+        return CompetitorCrawlResponse(
+            name=name,
+            course=course,
+            city=city,
+            area=area,
+            website=safe_url,
+            fb_page_id=fb_page_id,
+            fb_url=fb_url,
+            ig_handle=ig_handle,
+            description=description,
+            detected_social_links=list(set(social_links)),
+        )

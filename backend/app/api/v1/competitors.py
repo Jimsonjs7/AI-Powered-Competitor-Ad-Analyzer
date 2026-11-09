@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
 from app.schemas.competitor import (
+    CompetitorCrawlRequest,
+    CompetitorCrawlResponse,
     CompetitorCreate,
     CompetitorDiscoverItem,
     CompetitorDiscoverRequest,
@@ -72,3 +74,12 @@ def resolve_page_id(
 ):
     service = CompetitorService(db)
     return service.resolve_page_id(payload.input_text)
+
+
+@router.post("/crawl-website", response_model=CompetitorCrawlResponse)
+def crawl_competitor_website(
+    payload: CompetitorCrawlRequest,
+    db: Session = DbDependency,
+):
+    service = CompetitorService(db)
+    return service.crawl_competitor_website(payload.website_url)

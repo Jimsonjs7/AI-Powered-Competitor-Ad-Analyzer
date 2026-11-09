@@ -105,6 +105,7 @@ class DiscoveryService:
                             )
                             db.add(comp)
                             db.flush()
+                            db.add(CompetitorMetrics(competitor_id=comp.id))
                             pages_resolved += 1
                             discovered_competitors.append(comp)
 

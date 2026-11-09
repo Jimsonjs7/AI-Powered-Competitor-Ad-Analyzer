@@ -22,10 +22,23 @@ def start_discovery_run(
 ):
     profile_service = ProfileService(db)
     profile = profile_service.get_active_profile()
-    city = profile.city if profile else "Coimbatore"
-    domains = json.loads(profile.domains_json) if profile and profile.domains_json else ["AI", "Digital marketing"]
+    city = payload.city or (profile.city if profile else "Coimbatore")
+    
+    if payload.domains:
+        domains = payload.domains
+    else:
+        domains = json.loads(profile.domains_json) if profile and profile.domains_json else ["Digital marketing", "AI"]
 
-    search_terms = payload.search_terms or [f"{d} course" for d in domains]
+    search_terms = []
+    if payload.search_terms:
+        search_terms.extend(payload.search_terms)
+    else:
+        if payload.areas:
+            for d in domains:
+                for a in payload.areas:
+                    search_terms.append(f"{d} {a}")
+        for d in domains:
+            search_terms.append(f"{d} institute")
 
     discovery_service = DiscoveryService(db)
     run = discovery_service.create_run(radius_km=payload.radius_km, search_terms=search_terms)

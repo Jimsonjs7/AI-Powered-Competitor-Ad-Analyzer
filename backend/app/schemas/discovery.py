@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field
 
 class DiscoveryRunRequest(BaseModel):
     radius_km: float = Field(default=10.0, ge=1.0, le=100.0)
+    city: Optional[str] = None
+    areas: Optional[List[str]] = None
+    domains: Optional[List[str]] = None
     search_terms: Optional[List[str]] = None
 
 

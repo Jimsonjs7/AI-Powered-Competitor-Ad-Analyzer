@@ -27,6 +27,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
   const [description, setDescription] = useState("");
   const [city, setCity] = useState("Coimbatore");
   const [area, setArea] = useState("");
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [radiusKm, setRadiusKm] = useState(10);
   const [website, setWebsite] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
@@ -56,6 +59,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
       setDescription(p.description || "");
       setCity(p.city);
       setArea(p.area || "");
+      setLat(p.lat || null);
+      setLng(p.lng || null);
       setRadiusKm(p.radius_km || 10);
       setWebsite(p.website || "");
       const fb = (p.social_accounts || []).find((s) => s.platform.toLowerCase() === "facebook");
@@ -79,6 +84,48 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
     loadData();
   }, []);
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setStatusMsg("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsLocating(true);
+    setStatusMsg("Detecting location coordinates...");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const latitude = pos.coords.latitude;
+        const longitude = pos.coords.longitude;
+        setLat(latitude);
+        setLng(longitude);
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data.address || {};
+            const detectedCity = addr.city || addr.town || addr.municipality || addr.state_district || "Coimbatore";
+            const detectedArea = addr.suburb || addr.neighbourhood || addr.residential || addr.county || "";
+            setCity(detectedCity);
+            if (detectedArea) setArea(detectedArea);
+            setStatusMsg(`Location detected: ${detectedArea ? detectedArea + ", " : ""}${detectedCity}`);
+          } else {
+            setStatusMsg(`Coordinates saved: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+        } catch {
+          setStatusMsg(`Coordinates saved: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        setStatusMsg(`Could not detect location: ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setStatusMsg("");
@@ -96,6 +143,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
         description,
         city,
         area,
+        lat: lat || undefined,
+        lng: lng || undefined,
         radius_km: radiusKm,
         website,
         domains: domainsArr,
@@ -443,45 +492,113 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onBack, onProfileUpdat
       {/* Tab 4: Location */}
       {activeTab === "location" && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <h3 style={{ margin: 0, fontSize: 15 }}>Location & Service Radius</h3>
-          <p style={{ margin: "0 0 10px", color: "var(--muted)", fontSize: 13 }}>
-            Sets the boundary for local competitor discovery.
-          </p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15 }}>Location & Service Radius</h3>
+              <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>
+                Sets the boundary and center for local competitor discovery.
+              </p>
+            </div>
+            <button
+              className="btn"
+              disabled={isLocating}
+              onClick={handleDetectLocation}
+              style={{ fontSize: 12, padding: "6px 12px", background: "var(--canvas)" }}
+            >
+              {isLocating ? "Detecting location..." : "Detect my location"}
+            </button>
+          </div>
 
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>City</label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Area / Neighbourhood</label>
+              <input
+                type="text"
+                value={area}
+                placeholder="e.g. Gandhipuram / RS Puram"
+                onChange={(e) => setArea(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
+              />
+            </div>
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Area / Neighbourhood</label>
-            <input
-              type="text"
-              value={area}
-              placeholder="e.g. Gandhipuram / RS Puram"
-              onChange={(e) => setArea(e.target.value)}
-              style={{ width: "100%", padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 6 }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Service Radius Presets</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[5, 10, 25, 50].map((r) => (
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+              Quick area suggestions:
+            </label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["Gandhipuram", "RS Puram", "Peelamedu", "Saravanampatti", "Hopes College", "Saibaba Colony", "Singanallur", "Vadavalli"].map((loc) => (
                 <button
-                  key={r}
+                  key={loc}
                   className="fl"
-                  aria-pressed={radiusKm === r}
-                  onClick={() => setRadiusKm(r)}
+                  aria-pressed={area.toLowerCase().includes(loc.toLowerCase())}
+                  onClick={() => setArea(loc)}
+                  style={{ fontSize: 11, padding: "2px 8px" }}
                 >
-                  {r} km
+                  {loc}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {lat && lng && (
+            <div style={{ fontSize: 12, color: "var(--muted)", background: "var(--canvas)", padding: "6px 10px", borderRadius: 4 }}>
+              GPS Coordinates: {lat.toFixed(4)}, {lng.toFixed(4)}
+            </div>
+          )}
+
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Discovery Radius</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={radiusKm}
+                  onChange={(e) => setRadiusKm(Math.max(1, Math.min(100, Number(e.target.value))))}
+                  style={{ width: 64, padding: "4px 8px", border: "1px solid var(--line)", borderRadius: 6, fontSize: 13, textAlign: "right" }}
+                />
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>km</span>
+              </div>
+            </div>
+
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(Number(e.target.value))}
+              style={{ width: "100%", marginBottom: 10 }}
+            />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[5, 10, 15, 25, 50, 75, 100].map((r) => (
+                  <button
+                    key={r}
+                    className="fl"
+                    aria-pressed={radiusKm === r}
+                    onClick={() => setRadiusKm(r)}
+                    style={{ fontSize: 12, padding: "3px 8px" }}
+                  >
+                    {r} km
+                  </button>
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                Coverage: ~{Math.round(Math.PI * radiusKm * radiusKm)} km² around {area ? area + ", " : ""}{city}
+              </span>
             </div>
           </div>
         </div>

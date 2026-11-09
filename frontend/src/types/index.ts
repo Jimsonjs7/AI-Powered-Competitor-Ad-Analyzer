@@ -178,6 +178,19 @@ export interface DiscoveryStatus {
   finished_at?: string;
 }
 
+export interface CompetitorCrawlResult {
+  name: string;
+  course: string;
+  city: string;
+  area?: string;
+  website: string;
+  fb_page_id?: string;
+  fb_url?: string;
+  ig_handle?: string;
+  description?: string;
+  detected_social_links: string[];
+}
+
 // Phase D & E: Evidence and Weakness Types
 export interface WeaknessItem {
   id: number;
