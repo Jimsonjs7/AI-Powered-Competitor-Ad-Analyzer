@@ -13,8 +13,8 @@ logger = get_logger("provider.llm.gemini")
 class GeminiLLMClient(LLMClient):
     name = "gemini-3.5-flash-lite"
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.gemini_api_key
+    def __init__(self, api_keys: Optional[List[str]] = None):
+        self.api_keys = api_keys or settings.all_gemini_api_keys
         self.fallback = FallbackLLMClient()
 
     def analyze(
@@ -26,8 +26,9 @@ class GeminiLLMClient(LLMClient):
         cta: Optional[str] = None,
         running_days: int = 1,
     ) -> AdAnalysisSchema:
-        if not self.api_key:
-            logger.info("Gemini API key not configured. Using deterministic fallback analyzer.")
+        keys_pool = self.api_keys or settings.all_gemini_api_keys
+        if not keys_pool:
+            logger.info("No Gemini API keys configured. Using deterministic fallback analyzer.")
             return self.fallback.analyze(
                 images=images,
                 copy_text=copy_text,
@@ -35,8 +36,6 @@ class GeminiLLMClient(LLMClient):
                 cta=cta,
                 running_days=running_days,
             )
-
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.name}:generateContent?key={self.api_key}"
 
         system_instruction = (
             "You are an expert ad strategy analyst for BrandMonk Academy. "
@@ -75,30 +74,31 @@ Provide the analysis as valid JSON with these exact keys:
             "generationConfig": {"response_mime_type": "application/json"},
         }
 
-        try:
-            with httpx.Client(timeout=30.0) as client:
-                res = client.post(url, json=payload)
-                if res.status_code == 200:
-                    data = res.json()
-                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    parsed = json.loads(raw_text)
-                    return AdAnalysisSchema.model_validate(parsed)
-                else:
-                    logger.warning(f"Gemini API returned status {res.status_code}, using fallback.")
-                    return self.fallback.analyze(
-                        images=images,
-                        copy_text=copy_text,
-                        headline=headline,
-                        cta=cta,
-                        running_days=running_days,
-                    )
-        except Exception as e:
-            logger.error(f"Gemini API request failed: {e}. Defaulting to rubric fallback.")
-            return self.fallback.analyze(
-                images=images,
-                copy_text=copy_text,
-                headline=headline,
-                cta=cta,
-                running_days=running_days,
-            )
+        # Iterate through the pool of API keys for automatic failover
+        for idx, key in enumerate(keys_pool):
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.name}:generateContent?key={key}"
+            try:
+                with httpx.Client(timeout=30.0) as client:
+                    res = client.post(url, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed = json.loads(raw_text)
+                        return AdAnalysisSchema.model_validate(parsed)
+                    else:
+                        logger.warning(
+                            f"Gemini API key #{idx + 1} returned status {res.status_code}. Failing over to next key in pool..."
+                        )
+            except Exception as e:
+                logger.warning(
+                    f"Gemini API key #{idx + 1} request error ({e}). Failing over to next key in pool..."
+                )
 
+        logger.warning("All configured Gemini API keys exhausted or failed. Using fallback rubric analyzer.")
+        return self.fallback.analyze(
+            images=images,
+            copy_text=copy_text,
+            headline=headline,
+            cta=cta,
+            running_days=running_days,
+        )

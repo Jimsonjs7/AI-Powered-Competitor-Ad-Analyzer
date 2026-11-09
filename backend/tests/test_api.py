@@ -44,6 +44,34 @@ def test_get_ads(client):
     assert days == sorted(days, reverse=True)
 
 
+def test_get_market_insights(client):
+    response = client.get("/api/v1/ads/insights/market?city=Coimbatore")
+    assert response.status_code == 200
+    data = response.json()
+    assert "headline" in data
+    assert "subline" in data
+    assert "top_hook" in data
+    assert "gap_course" in data
+
+
+def test_discover_competitors(client):
+    payload = {"city": "Coimbatore", "query": "AI", "limit": 5}
+    response = client.post("/api/v1/competitors/discover", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert any("AI" in item["course"] for item in data)
+
+
+def test_resolve_page_id(client):
+    # Meta Ad Library URL test
+    url_payload = {"input_text": "https://www.facebook.com/ads/library/?view_all_page_id=1029384756"}
+    res = client.post("/api/v1/competitors/resolve", json=url_payload)
+    assert res.status_code == 200
+    assert res.json()["resolved_page_id"] == "1029384756"
+    assert res.json()["confidence"] == "high"
+
+
 def test_generate_poster_prompt(client):
     ads_res = client.get("/api/v1/ads")
     ad_id = ads_res.json()[0]["id"]

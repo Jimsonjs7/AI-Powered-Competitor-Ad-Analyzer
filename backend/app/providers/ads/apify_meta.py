@@ -11,8 +11,8 @@ logger = get_logger("provider.apify_meta")
 class ApifyMetaProvider(AdSource):
     name = "apify_meta_primary"
 
-    def __init__(self, token: Optional[str] = None, actor_id: Optional[str] = None):
-        self.token = (token or settings.apify_api_token or "").strip()
+    def __init__(self, tokens: Optional[List[str]] = None, actor_id: Optional[str] = None):
+        self.tokens = tokens or settings.all_apify_api_tokens
         configured_actor = (actor_id or settings.apify_meta_actor_id or "").strip()
         self.actor_id = configured_actor if configured_actor else "jaybird~meta-ad-library-scraper"
 
@@ -25,8 +25,9 @@ class ApifyMetaProvider(AdSource):
         status: str = "active",
         limit: int = 100,
     ) -> List[AdRecord]:
-        if not self.token:
-            logger.info("Apify API token not set, skipping provider.")
+        tokens_pool = self.tokens or settings.all_apify_api_tokens
+        if not tokens_pool:
+            logger.info("Apify API tokens not configured, skipping provider.")
             return []
 
         formatted_actor_id = self.actor_id.replace("/", "~")
@@ -39,22 +40,40 @@ class ApifyMetaProvider(AdSource):
             "maxAds": limit,
         }
 
-        try:
-            with httpx.Client(timeout=settings.scrape_timeout_seconds) as client:
-                response = client.post(
-                    url,
-                    headers={"Authorization": f"Bearer {self.token}"},
-                    json=run_input,
-                )
-                if response.status_code != 200:
-                    logger.error(f"Apify request failed with status: {response.status_code}")
-                    return []
+        # Iterate through token failover pool
+        for idx, token in enumerate(tokens_pool):
+            try:
+                with httpx.Client(timeout=settings.scrape_timeout_seconds) as client:
+                    response = client.post(
+                        url,
+                        headers={"Authorization": f"Bearer {token}"},
+                        json=run_input,
+                    )
+                    if response.status_code == 200:
+                        raw_items = response.json()
+                        return [self._normalize(item) for item in raw_items if isinstance(item, dict)]
+                    elif response.status_code == 201:
+                        # Some actors respond 201 with run metadata
+                        data = response.json()
+                        dataset_id = data.get("defaultDatasetId")
+                        if dataset_id:
+                            items_res = client.get(
+                                f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+                                headers={"Authorization": f"Bearer {token}"},
+                            )
+                            if items_res.status_code == 200:
+                                return [self._normalize(item) for item in items_res.json() if isinstance(item, dict)]
 
-                raw_items = response.json()
-                return [self._normalize(item) for item in raw_items if isinstance(item, dict)]
-        except Exception as e:
-            logger.error(f"Apify meta provider call failed: {e}")
-            raise e
+                    logger.warning(
+                        f"Apify token #{idx + 1} request returned status {response.status_code}. Failing over to next token in pool..."
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Apify token #{idx + 1} call error ({e}). Failing over to next token in pool..."
+                )
+
+        logger.info("All configured Apify tokens exhausted or returned no records.")
+        return []
 
     def _normalize(self, raw: Dict[str, Any]) -> AdRecord:
         archive_id = str(raw.get("id") or raw.get("ad_archive_id") or raw.get("adArchiveID") or "")
@@ -93,4 +112,3 @@ class ApifyMetaProvider(AdSource):
             media=media_items,
             raw=raw,
         )
-

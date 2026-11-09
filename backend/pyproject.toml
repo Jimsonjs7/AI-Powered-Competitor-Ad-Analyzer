@@ -1,5 +1,9 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "brandmonk-ad-desk-backend"
+name = "brandmonk-backend"
 version = "0.1.0"
 description = "Ad Desk Backend - BrandMonk Ad Analyzer"
 requires-python = ">=3.11"
@@ -13,6 +17,12 @@ dependencies = [
     "pillow>=10.4.0",
     "python-multipart>=0.0.12",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [dependency-groups]
 dev = [
