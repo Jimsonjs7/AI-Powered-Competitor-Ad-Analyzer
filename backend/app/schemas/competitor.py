@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -41,3 +41,29 @@ class CompetitorResponse(BaseModel):
     active_ads_count: int = 0
     is_active: bool = True
     created_at: datetime
+
+
+class CompetitorDiscoverRequest(BaseModel):
+    city: str = Field(default="Coimbatore", description="City to search competitors in")
+    query: Optional[str] = Field(None, description="Search keyword, e.g. AI course, UI UX institute")
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+class CompetitorDiscoverItem(BaseModel):
+    name: str
+    city: str
+    course: str
+    website: Optional[str] = None
+    suggested_page_id: Optional[str] = None
+    confidence: ConfidenceLevel
+
+
+class PageResolveRequest(BaseModel):
+    input_text: str = Field(..., description="Institute name, website URL, or Facebook Page URL")
+
+
+class PageResolveResponse(BaseModel):
+    resolved_name: str
+    resolved_page_id: Optional[str]
+    confidence: ConfidenceLevel
+    source: str

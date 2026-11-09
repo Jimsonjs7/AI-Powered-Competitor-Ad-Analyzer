@@ -72,3 +72,4 @@ class FallbackLLMClient(LLMClient):
             effectiveness_score=effectiveness_score,
             brandmonk_opportunity="Emphasize BrandMonk Academy's 1-on-1 mentor reviews, live studio projects, and verified alumni results in Coimbatore.",
         )
+

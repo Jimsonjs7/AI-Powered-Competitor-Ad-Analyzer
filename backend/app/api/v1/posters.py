@@ -43,3 +43,4 @@ def get_poster_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Poster image not found")
 
     return FileResponse(poster.image_path, media_type="image/png")
+

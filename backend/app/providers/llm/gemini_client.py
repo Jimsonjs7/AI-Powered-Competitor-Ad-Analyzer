@@ -11,7 +11,7 @@ logger = get_logger("provider.llm.gemini")
 
 
 class GeminiLLMClient(LLMClient):
-    name = "gemini-2.5-flash"
+    name = "gemini-3.5-flash-lite"
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.gemini_api_key
@@ -101,3 +101,4 @@ Provide the analysis as valid JSON with these exact keys:
                 cta=cta,
                 running_days=running_days,
             )
+

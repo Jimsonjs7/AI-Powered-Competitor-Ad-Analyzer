@@ -19,3 +19,4 @@ class HealthStatusResponse(BaseModel):
     total_providers_count: int
     message: str
     providers_health: dict
+

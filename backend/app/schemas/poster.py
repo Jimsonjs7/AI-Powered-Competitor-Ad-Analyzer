@@ -38,3 +38,4 @@ class PosterRenderResponse(BaseModel):
     image_url: str
     size_format: str
     status: str
+

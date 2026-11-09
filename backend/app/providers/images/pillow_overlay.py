@@ -170,3 +170,4 @@ class PillowPosterRenderer:
             bbox = draw.textbbox((0, 0), line, font=font)
             line_height = bbox[3] - bbox[1]
             y += line_height + line_spacing
+

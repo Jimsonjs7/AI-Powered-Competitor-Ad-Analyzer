@@ -43,3 +43,4 @@ class HealthService:
             message=message,
             providers_health=provider_health,
         )
+

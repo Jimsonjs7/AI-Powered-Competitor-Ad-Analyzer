@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -63,3 +63,13 @@ class AdFilterParams(BaseModel):
     sort_by: str = "days"
     limit: int = 100
     offset: int = 0
+
+
+class MarketInsightResponse(BaseModel):
+    headline: str
+    subline: str
+    top_hook: str
+    hook_percentage: int
+    course_distribution: Dict[str, int]
+    gap_course: str
+    total_active_ads: int

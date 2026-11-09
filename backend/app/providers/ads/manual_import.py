@@ -44,3 +44,4 @@ class ManualImportProvider(AdSource):
             media=[MediaItem(type="image", url=safe_url)],
             raw={"imported_url": safe_url},
         )
+

@@ -1,11 +1,12 @@
-from typing import List
+import json
+from typing import Any, List, Union
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -15,11 +16,24 @@ class Settings(BaseSettings):
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
-    allowed_origins: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-    ]
+
+    allowed_origins_raw: Union[List[str], str] = Field(
+        default=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+        alias="allowed_origins",
+    )
+
+    @property
+    def allowed_origins(self) -> List[str]:
+        v = self.allowed_origins_raw
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     # Security tokens
     api_bearer_token: str = Field(default="dev-insecure-token-brandmonk")
@@ -60,3 +74,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

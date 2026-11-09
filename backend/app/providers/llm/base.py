@@ -16,3 +16,4 @@ class LLMClient(Protocol):
     ) -> AdAnalysisSchema:
         """Execute multimodal strategic analysis and return validated AdAnalysisSchema."""
         ...
+

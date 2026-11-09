@@ -2,7 +2,14 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
-from app.schemas.competitor import CompetitorCreate, CompetitorResponse
+from app.schemas.competitor import (
+    CompetitorCreate,
+    CompetitorDiscoverItem,
+    CompetitorDiscoverRequest,
+    CompetitorResponse,
+    PageResolveRequest,
+    PageResolveResponse,
+)
 from app.services.competitor_service import CompetitorService
 
 router = APIRouter(prefix="/competitors", tags=["competitors"], dependencies=[AuthDependency])
@@ -36,3 +43,21 @@ def add_competitor(
         is_active=comp.is_active,
         created_at=comp.created_at,
     )
+
+
+@router.post("/discover", response_model=List[CompetitorDiscoverItem])
+def discover_competitors(
+    payload: CompetitorDiscoverRequest,
+    db: Session = DbDependency,
+):
+    service = CompetitorService(db)
+    return service.discover_competitors(payload)
+
+
+@router.post("/resolve", response_model=PageResolveResponse)
+def resolve_page_id(
+    payload: PageResolveRequest,
+    db: Session = DbDependency,
+):
+    service = CompetitorService(db)
+    return service.resolve_page_id(payload.input_text)

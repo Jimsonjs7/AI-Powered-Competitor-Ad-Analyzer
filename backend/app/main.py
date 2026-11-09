@@ -17,15 +17,20 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables verified and initialized.")
 
-    # Seed initial competitors and ads if empty
+    # Seed initial competitors and ads if empty (instant local seed)
     db = SessionLocal()
     try:
         comp_service = CompetitorService(db)
         comp_service.seed_initial_competitors()
 
-        ad_service = AdService(db)
-        ad_count = ad_service.refresh_all_competitors()
-        logger.info(f"Seed verified: {ad_count} initial ads active.")
+        from app.models.ad import Ad
+        from app.models.competitor import Competitor
+        if db.query(Ad).count() == 0:
+            first_comp = db.query(Competitor).first()
+            if first_comp:
+                ad_service = AdService(db)
+                ad_service.collect_ads_for_competitor(first_comp.id)
+                logger.info("Initial seed ads verified.")
     finally:
         db.close()
 
@@ -57,3 +62,4 @@ app.include_router(api_router, prefix="/api")
 @app.get("/health", tags=["health"])
 def root_health():
     return {"status": "ok", "app": settings.app_name}
+

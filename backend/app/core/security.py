@@ -81,3 +81,4 @@ def sanitize_text(text: str | None) -> str:
         return ""
     clean = text.replace("\x00", "").strip()
     return clean
+

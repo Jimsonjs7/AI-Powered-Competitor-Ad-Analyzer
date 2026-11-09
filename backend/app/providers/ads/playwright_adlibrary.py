@@ -21,3 +21,4 @@ class PlaywrightAdLibraryProvider(AdSource):
         logger.info(f"Playwright fallback invoked for page_id: {page_id}")
         # Graceful fallback when headless browser is not active
         return []
+

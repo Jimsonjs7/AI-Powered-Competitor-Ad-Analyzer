@@ -70,3 +70,4 @@ class AnalysisService:
             effectiveness_score=analysis.effectiveness_score,
             brandmonk_opportunity=analysis.brandmonk_opportunity,
         )
+

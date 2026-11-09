@@ -28,3 +28,4 @@ class AnalysisResponse(BaseModel):
     ad_id: int
     analysis: AdAnalysisSchema
     cached: bool = True
+

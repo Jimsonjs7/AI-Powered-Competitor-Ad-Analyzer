@@ -112,3 +112,4 @@ def manual_import_ad(
         message="Manual ad imported successfully.",
         total_ads_collected=1,
     )
+

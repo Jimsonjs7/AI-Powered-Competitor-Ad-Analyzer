@@ -132,3 +132,4 @@ class PosterService:
             size_format=req.size_format,
             status="rendered",
         )
+

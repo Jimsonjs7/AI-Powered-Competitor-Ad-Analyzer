@@ -9,3 +9,4 @@ api_router.include_router(competitors_router)
 api_router.include_router(ads_router)
 api_router.include_router(posters_router)
 api_router.include_router(health_router)
+

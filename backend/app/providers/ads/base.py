@@ -16,3 +16,4 @@ class AdSource(Protocol):
     ) -> List[AdRecord]:
         """Fetch and return normalised AdRecord list from target ad provider."""
         ...
+

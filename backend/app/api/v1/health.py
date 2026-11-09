@@ -11,3 +11,4 @@ router = APIRouter(prefix="/health", tags=["health"])
 def get_health_status(db: Session = DbDependency):
     service = HealthService(db)
     return service.check_providers()
+

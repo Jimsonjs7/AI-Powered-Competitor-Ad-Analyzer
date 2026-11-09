@@ -12,8 +12,9 @@ class ApifyMetaProvider(AdSource):
     name = "apify_meta_primary"
 
     def __init__(self, token: Optional[str] = None, actor_id: Optional[str] = None):
-        self.token = token or settings.apify_api_token
-        self.actor_id = actor_id or settings.apify_meta_actor_id
+        self.token = (token or settings.apify_api_token or "").strip()
+        configured_actor = (actor_id or settings.apify_meta_actor_id or "").strip()
+        self.actor_id = configured_actor if configured_actor else "jaybird~meta-ad-library-scraper"
 
     def fetch_ads(
         self,
@@ -28,7 +29,8 @@ class ApifyMetaProvider(AdSource):
             logger.info("Apify API token not set, skipping provider.")
             return []
 
-        url = f"https://api.apify.com/v2/acts/{self.actor_id}/run-sync-get-dataset-items"
+        formatted_actor_id = self.actor_id.replace("/", "~")
+        url = f"https://api.apify.com/v2/acts/{formatted_actor_id}/run-sync-get-dataset-items"
         run_input = {
             "pageIds": [page_id] if page_id else [],
             "searchQuery": keyword or "",
@@ -91,3 +93,4 @@ class ApifyMetaProvider(AdSource):
             media=media_items,
             raw=raw,
         )
+
