@@ -63,12 +63,18 @@ Ad Desk is an AI-powered competitor ad intelligence and creative generation web 
 - `frontend/src/App.tsx`: Three-pane desktop workspace (Rail, Wall, Pane) and responsive view
 
 ## 5. Setup Process
-### Backend Setup
+### Backend Setup (Recommended: uv)
+`uv` is pre-installed on this machine at `~/.local/bin/uv`.
+1. Navigate to `backend/`
+2. Sync dependencies: `uv sync` (or `~/.local/bin/uv sync`)
+3. Run dev server: `uv run python run.py` (serves on `http://localhost:8000`)
+4. Run tests: `uv run pytest tests/`
+
+### Backend Setup (Alternative: standard pip)
 1. Navigate to `backend/`
 2. Create and activate virtual environment: `python3 -m venv .venv && source .venv/bin/activate`
 3. Install dependencies: `pip install -r requirements.txt`
-4. Copy environment template: `cp ../.env.example .env` and populate values
-5. Run development server: `python run.py` (serves on `http://localhost:8000`)
+4. Run dev server: `python run.py`
 
 ### Frontend Setup
 1. Navigate to `frontend/`
@@ -84,3 +90,4 @@ Ad Desk is an AI-powered competitor ad intelligence and creative generation web 
 ## 7. Known Limitations
 - Meta Ad Library does not offer a free commercial API for India; collection relies on hosted scrapers or browser replay.
 - External scraping runs are subject to provider availability; cached ads and offline fallbacks are served during provider outages.
+
