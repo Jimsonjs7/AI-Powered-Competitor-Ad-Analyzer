@@ -8,6 +8,11 @@ PROJECT_HISTORY.md
 UPDATED_WORKFLOW.md
 *.log
 
+# Presentation and review guides (kept local for verification)
+*presentation*.md
+*PRESENTATION*.md
+docs/*presentation*
+
 # Database and media storage
 *.db
 *.sqlite
