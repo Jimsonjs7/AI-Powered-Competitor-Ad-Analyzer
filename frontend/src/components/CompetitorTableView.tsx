@@ -20,6 +20,7 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
   onRefreshCompetitors,
 }) => {
   const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
+  const [selectedReportAd, setSelectedReportAd] = useState<Ad | null>(null);
   const [detailTab, setDetailTab] = useState<"ads" | "weaknesses">("ads");
   const [competitorAds, setCompetitorAds] = useState<Ad[]>([]);
   const [isLoadingAds, setIsLoadingAds] = useState(false);
@@ -40,7 +41,7 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
   // Filter state
   const [filterCourse, setFilterCourse] = useState("All");
   const [filterHasAds, setFilterHasAds] = useState<"all" | "yes" | "no">("all");
-  const [sortBy, setSortBy] = useState<"ads" | "distance" | "weakness" | "name">("ads");
+  const [sortBy, setSortBy] = useState<"ads" | "distance" | "name">("ads");
 
   const handleInspectCompetitor = async (comp: Competitor, tab: "ads" | "weaknesses" = "ads") => {
     setSelectedCompId(comp.id);
@@ -113,8 +114,6 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
     filtered.sort((a, b) => b.active_ads_count - a.active_ads_count);
   } else if (sortBy === "distance") {
     filtered.sort((a, b) => (a.distance_km || 99) - (b.distance_km || 99));
-  } else if (sortBy === "weakness") {
-    filtered.sort((a, b) => (b.metrics?.weakness_score || 0) - (a.metrics?.weakness_score || 0));
   } else if (sortBy === "name") {
     filtered.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -128,7 +127,7 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
         <div>
           <h2 style={{ margin: 0, fontSize: 18 }}>Competitor Directory & Data Sufficiency</h2>
           <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>
-            Inspect competitor metrics, distance, active ad volume, and evidence-backed weaknesses.
+            Inspect competitor metrics, distance, active ad volume, and live ad intelligence.
           </p>
         </div>
         <button className="btn" onClick={onBack}>
@@ -175,7 +174,6 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
           >
             <option value="ads">Most active ads</option>
             <option value="distance">Nearest first</option>
-            <option value="weakness">Highest weakness score</option>
             <option value="name">Alphabetical</option>
           </select>
         </div>
@@ -190,61 +188,103 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
               <th style={{ padding: "10px 14px" }}>Course</th>
               <th style={{ padding: "10px 14px" }}>Location</th>
               <th style={{ padding: "10px 14px" }}>Active Ads</th>
-              <th style={{ padding: "10px 14px" }}>Weakness Score</th>
               <th style={{ padding: "10px 14px" }}>Data Status</th>
               <th style={{ padding: "10px 14px", textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((comp) => {
-              const isReady = comp.active_ads_count >= 3 || comp.data_status === "analyzed";
-              return (
-                <tr key={comp.id} style={{ borderBottom: "1px solid var(--line)" }}>
-                  <td style={{ padding: "12px 14px", fontWeight: 600 }}>
-                    <a
-                      href="#inspect"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleInspectCompetitor(comp, "ads");
-                      }}
-                      style={{ color: "var(--ink)", textDecoration: "none", borderBottom: "1px dashed var(--line)" }}
-                    >
-                      {comp.name}
-                    </a>
+            {filtered.length === 0 ? (
+              competitors.length === 0 ? (
+                // Skeleton loading rows
+                [1, 2, 3, 4, 5].map((idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div className="skeleton" style={{ width: 140, height: 16 }} />
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div className="skeleton" style={{ width: 80, height: 16 }} />
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div className="skeleton" style={{ width: 120, height: 16 }} />
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div className="skeleton" style={{ width: 60, height: 16 }} />
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div className="skeleton" style={{ width: 90, height: 22, borderRadius: 12 }} />
+                    </td>
+                    <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                      <div className="skeleton" style={{ width: 100, height: 26, marginLeft: "auto", borderRadius: 4 }} />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} style={{ padding: "28px 14px", textAlign: "center", color: "var(--muted)" }}>
+                    No competitors match the selected filters.
                   </td>
-                  <td style={{ padding: "12px 14px" }}>{comp.course}</td>
-                  <td style={{ padding: "12px 14px", color: "var(--muted)" }}>
-                    {comp.city} {comp.area ? `· ${comp.area}` : ""} {comp.distance_km ? `(${comp.distance_km} km)` : ""}
-                  </td>
-                  <td style={{ padding: "12px 14px" }}>
-                    <b>{comp.active_ads_count}</b> ads
-                  </td>
-                  <td style={{ padding: "12px 14px" }}>
-                    {comp.metrics?.weakness_score ? (
-                      <span className="chip" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
-                        {comp.metrics.weakness_score}
-                      </span>
-                    ) : (
-                      <span style={{ color: "var(--muted)" }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "12px 14px" }}>
-                    <span
-                      className="chip"
-                      style={{
-                        background: isReady ? "var(--accent-soft)" : "var(--canvas)",
-                        color: isReady ? "var(--accent)" : "var(--muted)",
-                      }}
-                    >
-                      {comp.data_status === "analyzed"
-                        ? "Analyzed"
-                        : isReady
-                        ? "Ready to analyze"
-                        : "Not enough data"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "12px 14px", textAlign: "right" }}>
-                    <div style={{ display: "inline-flex", gap: 6 }}>
+                </tr>
+              )
+            ) : (
+              filtered.map((comp) => {
+                return (
+                  <tr key={comp.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ padding: "12px 14px", fontWeight: 600 }}>
+                      <a
+                        href="#inspect"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleInspectCompetitor(comp, "ads");
+                        }}
+                        style={{ color: "var(--ink)", textDecoration: "none", borderBottom: "1px dashed var(--line)" }}
+                      >
+                        {comp.name}
+                      </a>
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>{comp.course}</td>
+                    <td style={{ padding: "12px 14px", color: "var(--muted)" }}>
+                      {comp.city} {comp.area ? `· ${comp.area}` : ""} {comp.distance_km ? `(${comp.distance_km} km)` : ""}
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <b>{comp.active_ads_count}</b> ads
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      {comp.data_status === "analyzed" ? (
+                        <span
+                          className="chip"
+                          style={{
+                            background: "#ecfdf5",
+                            color: "#065f46",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Analyzed
+                        </span>
+                      ) : comp.active_ads_count > 0 ? (
+                        <span
+                          className="chip"
+                          style={{
+                            background: "var(--accent-soft)",
+                            color: "var(--accent)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {comp.active_ads_count} {comp.active_ads_count === 1 ? "ad" : "ads"} tracked
+                        </span>
+                      ) : (
+                        <span
+                          className="chip"
+                          style={{
+                            background: "var(--canvas)",
+                            color: "var(--muted)",
+                          }}
+                        >
+                          Zero active ads
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                      <div style={{ display: "inline-flex", gap: 6 }}>
                       <button
                         className="btn"
                         style={{ fontSize: 12, padding: "3px 8px" }}
@@ -263,7 +303,8 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
                   </td>
                 </tr>
               );
-            })}
+            })
+          )}
           </tbody>
         </table>
       </div>
@@ -399,16 +440,25 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
                           <span style={{ fontSize: 11, color: "var(--muted)", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {ad.hook ? `Hook: ${ad.hook}` : "Active Ad"}
                           </span>
-                          <button
-                            className="btn pri"
-                            onClick={() => {
-                              setCounterAdId(ad.id);
-                              setCounterMediaUrl(ad.media_url);
-                            }}
-                            style={{ fontSize: 11, padding: "3px 8px" }}
-                          >
-                            Counter this Ad
-                          </button>
+                          <div style={{ display: "inline-flex", gap: 6 }}>
+                            <button
+                              className="btn"
+                              onClick={() => setSelectedReportAd(ad)}
+                              style={{ fontSize: 11, padding: "3px 8px" }}
+                            >
+                              Marketing Report
+                            </button>
+                            <button
+                              className="btn pri"
+                              onClick={() => {
+                                setCounterAdId(ad.id);
+                                setCounterMediaUrl(ad.media_url);
+                              }}
+                              style={{ fontSize: 11, padding: "3px 8px" }}
+                            >
+                              Counter this Ad
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -534,6 +584,150 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
             <button className="btn pri" disabled={isImporting || !evidenceText.trim()} onClick={handleImportEvidence}>
               {isImporting ? "Saving..." : "Save Evidence"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Competitor Marketing Report Modal */}
+      {selectedReportAd && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setSelectedReportAd(null)}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              borderRadius: 8,
+              border: "1px solid var(--line)",
+              width: "100%",
+              maxWidth: 620,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span className="chip" style={{ background: "var(--accent-soft)", color: "var(--accent)", fontWeight: 600 }}>
+                    Marketing Intelligence Report
+                  </span>
+                  <span className="chip" style={{ background: "var(--canvas)", color: "var(--muted)" }}>
+                    {selectedReportAd.platforms?.join(" / ") || "Meta"}
+                  </span>
+                </div>
+                <h3 style={{ margin: 0, fontSize: 18 }}>{selectedReportAd.competitor_name}</h3>
+                <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: 13 }}>
+                  {selectedReportAd.course} · Running for {selectedReportAd.run_days} days
+                </p>
+              </div>
+              <button className="btn" onClick={() => setSelectedReportAd(null)}>
+                Close
+              </button>
+            </div>
+
+            {/* Target Audience Persona Card */}
+            <div style={{ background: "var(--canvas)", border: "1px solid var(--line)", borderRadius: 6, padding: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 8 }}>
+                Target audience profile & intent
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, lineHeight: 1.45 }}>
+                <div>
+                  <strong style={{ color: "var(--ink)" }}>Primary Persona:</strong>{" "}
+                  <span style={{ color: "var(--muted)" }}>{selectedReportAd.audience || "Fresh college graduates and non-technical professionals seeking job transitions (Ages 20-28)"}</span>
+                </div>
+                <div>
+                  <strong style={{ color: "var(--ink)" }}>Psychological Mindset:</strong>{" "}
+                  <span style={{ color: "var(--muted)" }}>
+                    Anxious about hiring freezes and career stagnation. Looking for fast reassurance, guaranteed outcomes, and peer validation.
+                  </span>
+                </div>
+                <div>
+                  <strong style={{ color: "var(--ink)" }}>Ad Funnel Stage:</strong>{" "}
+                  <span style={{ color: "var(--muted)" }}>
+                    {selectedReportAd.run_days > 25
+                      ? "High-intent middle/bottom funnel (converting active seekers comparing institutes)"
+                      : "Top-of-funnel impression driver (generating initial curiosity and contact leads)"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* What They Really Mean Card */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderLeft: "4px solid #0a7c6e", borderRadius: 6, padding: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 8 }}>
+                Decoded ad subtext (what they really mean)
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, lineHeight: 1.5 }}>
+                <div style={{ background: "var(--canvas)", padding: "8px 10px", borderRadius: 4, border: "1px solid var(--line)" }}>
+                  <span style={{ fontSize: 11, color: "var(--muted)", display: "block", fontWeight: 600 }}>SURFACE MARKETING PITCH:</span>
+                  <span style={{ color: "var(--ink)", fontWeight: 600 }}>"{selectedReportAd.hook || selectedReportAd.headline || selectedReportAd.offer || 'Enroll now for fast career launch'}"</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: "#0a7c6e", display: "block", fontWeight: 700 }}>THE REALITY BEHIND THE PITCH:</span>
+                  <p style={{ margin: "2px 0 0", color: "var(--ink)" }}>
+                    {selectedReportAd.why || "The competitor uses a blanket outcome promise to capture contact details quickly, hiding curriculum rigor and batch fee schedules behind a phone sales wall."}
+                  </p>
+                </div>
+                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--warn)", display: "block", fontWeight: 700 }}>COMPETITOR VULNERABILITY:</span>
+                  <p style={{ margin: "2px 0 0", color: "var(--ink)" }}>
+                    {selectedReportAd.weak || "Omission of transparent batch fees, verified alumni portfolio links, and real hiring partner proof."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Marketing Team Action Battlecard */}
+            <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 6, padding: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)", marginBottom: 10 }}>
+                BrandMonk team battlecard & counter-play
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, lineHeight: 1.45 }}>
+                <div>
+                  <strong style={{ color: "var(--accent)" }}>Ad Campaign Strategy:</strong>
+                  <p style={{ margin: "2px 0 0", color: "var(--ink)" }}>
+                    Run a proof-contrast counter ad. While {selectedReportAd.competitor_name} emphasizes broad claims, BrandMonk should highlight upfront syllabus transparency and mentor portfolio reviews.
+                  </p>
+                </div>
+                <div style={{ borderTop: "1px dashed var(--line)", paddingTop: 8 }}>
+                  <strong style={{ color: "var(--ink)" }}>Admissions Counselor Talking Point:</strong>
+                  <p style={{ margin: "2px 0 0", color: "var(--muted)", fontStyle: "italic" }}>
+                    "When prospects bring up {selectedReportAd.competitor_name}'s promises, ask them if they were shown actual week-by-week live projects or if it's mostly self-paced videos. At BrandMonk, working practitioners review your code live."
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button
+                className="btn pri"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setCounterAdId(selectedReportAd.id);
+                  setCounterMediaUrl(selectedReportAd.media_url);
+                  setSelectedReportAd(null);
+                }}
+              >
+                Generate Counter-Ad Strategy
+              </button>
+              <button className="btn" onClick={() => setSelectedReportAd(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

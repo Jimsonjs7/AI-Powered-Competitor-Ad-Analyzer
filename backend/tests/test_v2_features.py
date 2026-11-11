@@ -62,10 +62,10 @@ def test_profile_lifecycle(client):
 
 
 def test_discovery_agent_lifecycle(client):
-    async def dummy_async_discovery(*args, **kwargs):
+    def dummy_discovery(*args, **kwargs):
         pass
 
-    with patch("app.services.discovery_service.DiscoveryService.execute_discovery_async", side_effect=dummy_async_discovery):
+    with patch("app.services.discovery_service.DiscoveryService.execute_discovery", side_effect=dummy_discovery):
         # Start discovery run
         payload = {"radius_km": 10.0, "search_terms": ["AI Training Institute"]}
         res = client.post("/api/v1/discovery/run", json=payload)

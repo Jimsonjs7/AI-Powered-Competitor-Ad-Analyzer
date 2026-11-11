@@ -78,8 +78,9 @@ class ApifyMetaProvider(AdSource):
                     elif response.status_code == 201:
                         # Asynchronous execution started: poll run status until completion
                         data = response.json()
-                        run_id = data.get("id")
-                        dataset_id = data.get("defaultDatasetId")
+                        data_obj = data.get("data") if isinstance(data, dict) and isinstance(data.get("data"), dict) else data
+                        run_id = data_obj.get("id") if isinstance(data_obj, dict) else None
+                        dataset_id = data_obj.get("defaultDatasetId") if isinstance(data_obj, dict) else None
                         if run_id and dataset_id:
                             records = self._poll_run_results(client, token, run_id, dataset_id)
                             if records is not None:
@@ -164,23 +165,30 @@ class ApifyMetaProvider(AdSource):
             media_items.append(MediaItem(type="video", url=single_vid))
 
         # Fallback to snapshot parsing if present
+        snap = raw.get("snapshot")
+        snap_obj = snap[0] if isinstance(snap, list) and len(snap) > 0 and isinstance(snap[0], dict) else (snap if isinstance(snap, dict) else {})
+
         if not media_items:
-            images = raw.get("images") or raw.get("snapshot", {}).get("images") or []
-            for img in images:
-                u = img if isinstance(img, str) else img.get("url") or img.get("original_image_url")
-                if u:
-                    media_items.append(MediaItem(type="image", url=str(u)))
+            images = raw.get("images") or snap_obj.get("images") or []
+            if isinstance(images, list):
+                for img in images:
+                    u = img if isinstance(img, str) else (img.get("url") or img.get("original_image_url") if isinstance(img, dict) else None)
+                    if u:
+                        media_items.append(MediaItem(type="image", url=str(u)))
+
+        snap_body = snap_obj.get("body")
+        snap_body_text = snap_body.get("text") if isinstance(snap_body, dict) else (snap_body if isinstance(snap_body, str) else "")
 
         copy_text = (
             raw.get("body_text")
             or raw.get("body")
             or raw.get("copy")
             or raw.get("caption")
-            or raw.get("snapshot", {}).get("body", {}).get("text")
+            or snap_body_text
             or ""
         )
-        headline_text = raw.get("title") or raw.get("headline") or raw.get("snapshot", {}).get("title")
-        cta_text = raw.get("cta_text") or raw.get("cta") or raw.get("snapshot", {}).get("cta_text")
+        headline_text = raw.get("title") or raw.get("headline") or snap_obj.get("title")
+        cta_text = raw.get("cta_text") or raw.get("cta") or snap_obj.get("cta_text")
 
         return AdRecord(
             ad_archive_id=archive_id,

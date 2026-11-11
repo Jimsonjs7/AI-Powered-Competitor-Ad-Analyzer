@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api.deps import AuthDependency, DbDependency
@@ -12,6 +13,31 @@ from app.services.discovery_service import DiscoveryService
 from app.services.profile_service import ProfileService
 
 router = APIRouter(prefix="/discovery", tags=["discovery"], dependencies=[AuthDependency])
+
+
+@router.get("/active", response_model=Optional[DiscoveryStatusResponse])
+def get_active_run(
+    db: Session = DbDependency,
+):
+    service = DiscoveryService(db)
+    run = service.get_active_run()
+    if not run:
+        return None
+
+    counts = json.loads(run.counts_json) if run.counts_json else {}
+    filters = json.loads(run.filters_json) if run.filters_json else {}
+
+    return DiscoveryStatusResponse(
+        run_id=run.id,
+        status=run.status,
+        current_step=run.current_step,
+        radius_km=run.radius_km,
+        filters=filters,
+        counts=counts,
+        cost_usd=run.cost_usd,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+    )
 
 
 @router.post("/run", response_model=DiscoveryRunResponse)
@@ -45,7 +71,7 @@ def start_discovery_run(
 
     # Launch background task
     background_tasks.add_task(
-        DiscoveryService.execute_discovery_async,
+        DiscoveryService.execute_discovery,
         run_id=run.id,
         city=city,
         search_terms=search_terms,

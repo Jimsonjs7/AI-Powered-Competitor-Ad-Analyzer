@@ -51,10 +51,12 @@ class CreativeRecommenderService:
         # 2. Generate 3 Strategic Counter Angles
         angles = self._build_counter_angles(ad, client_name, city, approved_claims, preferred_cta, audit)
 
+        course_name = ad.competitor.course if ad.competitor else "Digital marketing"
+
         return CreativeCounterAdResponse(
             ad_id=ad.id,
             client_name=client_name,
-            course=ad.course or "Digital marketing",
+            course=course_name,
             competitor_audit=audit,
             angles=angles,
             recommended_cta=preferred_cta,
@@ -65,12 +67,19 @@ class CreativeRecommenderService:
         copy_text = ad.copy or ""
         headline_text = ad.headline or ""
         run_days = ad.run_days or 1
+        comp_name = ad.competitor.name if ad.competitor else "Competitor"
 
         vulnerabilities = []
         unaddressed_doubts = []
 
         # Check for pricing mention
-        has_price = bool(re.search(r"(\$|₹|rs\.?|inr|\d{3,5})", copy_text, re.IGNORECASE))
+        has_price = bool(
+            re.search(
+                r"(?:[\$₹]|(?:rs\.?|inr|fees?|pricing|price)\b\s*\d+|\b\d+\s*(?:rs|inr|rupees|per\s+month|\/-\b))",
+                copy_text,
+                re.IGNORECASE,
+            )
+        )
         if not has_price:
             vulnerabilities.append("No pricing transparency in ad copy; creates doubt and lead friction.")
             unaddressed_doubts.append("Are there hidden setup fees or surprise retainer charges?")
@@ -108,7 +117,7 @@ class CreativeRecommenderService:
         )
 
         return CompetitorAdFlawAudit(
-            competitor_name=ad.competitor_name or "Competitor",
+            competitor_name=comp_name,
             headline=headline_text,
             copy_snippet=copy_text[:140] + ("..." if len(copy_text) > 140 else ""),
             active_days=run_days,
@@ -128,7 +137,7 @@ class CreativeRecommenderService:
         cta: str,
         audit: CompetitorAdFlawAudit,
     ) -> List[CounterCreativeAngle]:
-        course = ad.course or "Digital marketing"
+        course = (ad.competitor.course if ad.competitor else None) or "Digital marketing"
         claim_1 = approved_claims[0] if len(approved_claims) > 0 else "Custom performance marketing with transparent conversion reporting"
         claim_2 = approved_claims[1] if len(approved_claims) > 1 else "Dedicated growth managers with direct weekly communication"
         claim_3 = approved_claims[2] if len(approved_claims) > 2 else "Upfront transparent pricing with zero hidden charges"
@@ -276,3 +285,4 @@ class CreativeRecommenderService:
         angles.append(angle_3)
 
         return angles
+

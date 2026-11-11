@@ -13,6 +13,7 @@ from app.models.media import AdMedia
 from app.models.scrape_run import ScrapeRun
 from app.providers.ads.apify_meta import ApifyMetaProvider
 from app.providers.ads.base import AdSource
+from app.providers.ads.mock_provider import MockAdProvider
 from app.providers.ads.playwright_adlibrary import PlaywrightAdLibraryProvider
 from app.providers.ads.scrapecreators import ScrapeCreatorsProvider
 from app.schemas.ad import AdFilterParams, AdRecord, AdResponse, MarketInsightResponse
@@ -28,6 +29,7 @@ class AdService:
             ApifyMetaProvider(),
             ScrapeCreatorsProvider(),
             PlaywrightAdLibraryProvider(),
+            MockAdProvider(),
         ]
         self.media_dir = os.path.join(settings.media_storage_dir, "creatives")
         os.makedirs(self.media_dir, exist_ok=True)
@@ -211,11 +213,18 @@ class AdService:
                 )
                 logger.warning(f"Provider {provider.name} failed: {e}. Falling through to next provider.")
 
-        # Persist and deduplicate by ad_archive_id
+        return self.persist_ad_records(competitor.id, collected_records)
+
+    def persist_ad_records(self, competitor_id: int, collected_records: List[AdRecord]) -> int:
+        competitor = self.db.query(Competitor).filter(Competitor.id == competitor_id).first()
+        if not competitor or not collected_records:
+            return 0
+
         upserted_count = 0
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
         for rec in collected_records:
             existing = self.db.query(Ad).filter(Ad.ad_archive_id == rec.ad_archive_id).first()
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
 
             if existing:
                 existing.last_seen = now

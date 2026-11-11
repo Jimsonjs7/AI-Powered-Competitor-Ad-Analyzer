@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import Any, List, Union
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     app_name: str = "Ad Desk - BrandMonk Ad Analyzer"
     environment: str = "development"
     debug: bool = False
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def coerce_debug(cls, v: object) -> bool:
+        if isinstance(v, str):
+            return v.lower() in ("1", "true", "yes", "on")
+        return bool(v)
     host: str = "0.0.0.0"
     port: int = 8000
 
@@ -67,16 +74,12 @@ class Settings(BaseSettings):
     apify_meta_actor_id: str = "jaybird~meta-ad-library-scraper"
     apify_maps_actor_id: str = "compass/crawler-google-places"
     scrapecreators_api_key: str | None = None
-    serpapi_api_key: str | None = None
-    google_places_api_key: str | None = None
 
     # AI Multimodal Keys (with multi-key failover pool)
     gemini_api_key: str | None = None
     gemini_api_key_2: str | None = None
     gemini_api_key_3: str | None = None
     gemini_api_keys: str | None = None
-    anthropic_api_key: str | None = None
-    image_generation_api_key: str | None = None
 
     @property
     def all_apify_api_tokens(self) -> List[str]:

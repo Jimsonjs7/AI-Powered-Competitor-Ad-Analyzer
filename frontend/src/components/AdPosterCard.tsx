@@ -8,7 +8,9 @@ interface AdPosterCardProps {
 }
 
 export const AdPosterCard: React.FC<AdPosterCardProps> = ({ ad, className = "", sizeClass = "" }) => {
-  // Palette styling based on course subject or id for consistent visual identity
+  const [imgError, setImgError] = React.useState(false);
+
+  // Fallback color palette when no real image is available
   const palettes = [
     { bg: "#12324F", fg: "#FFFFFF", ac: "#F2B84B" },
     { bg: "#E3F3EC", fg: "#0E3B2E", ac: "#17795A" },
@@ -19,6 +21,59 @@ export const AdPosterCard: React.FC<AdPosterCardProps> = ({ ad, className = "", 
   ];
   const p = palettes[ad.id % palettes.length];
 
+  // Real image ad
+  if (ad.media_url && ad.media_type !== "video" && !imgError) {
+    return (
+      <div
+        className={`poster-img ${sizeClass} ${className}`.trim()}
+        style={{ position: "relative", borderRadius: 6, overflow: "hidden", aspectRatio: "4/5", background: "#1B2421" }}
+      >
+        <img
+          src={ad.media_url}
+          alt={ad.headline || ad.course}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          loading="lazy"
+          onError={() => setImgError(true)}
+        />
+        {/* Overlay chip + course label */}
+        <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 4, flexWrap: "wrap" }}>
+          <span style={{ background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            {ad.course}
+          </span>
+          {ad.score != null && (
+            <span style={{ background: "#0A7C6E", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10 }}>
+              {ad.score}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Video ad
+  if (ad.media_url && ad.media_type === "video") {
+    return (
+      <a
+        href={ad.media_url}
+        target="_blank"
+        rel="noreferrer"
+        className={`poster-vid ${sizeClass} ${className}`.trim()}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, background: "#1B2421", borderRadius: 6, aspectRatio: "4/5", textDecoration: "none", color: "#fff" }}
+        aria-label={`Watch video ad by ${ad.competitor_name}`}
+      >
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polygon points="10 8 16 12 10 16 10 8" fill="#fff" stroke="none" />
+        </svg>
+        <span style={{ fontSize: 12, opacity: 0.75 }}>Watch video</span>
+        <span style={{ background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          {ad.course}
+        </span>
+      </a>
+    );
+  }
+
+  // Fallback: color-block poster
   return (
     <div
       className={`poster ${sizeClass} ${className}`.trim()}

@@ -387,8 +387,19 @@ class ProfileService:
         description = None
         suggestions = []
 
+        def check_redirect_url(response: httpx.Response):
+            redirect_loc = response.headers.get("Location")
+            if redirect_loc:
+                from urllib.parse import urljoin
+                resolved_redirect = urljoin(str(response.url), redirect_loc)
+                validate_target_url(resolved_redirect, check_whitelist=False)
+
         try:
-            with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+            with httpx.Client(
+                timeout=10.0,
+                follow_redirects=True,
+                event_hooks={"response": [check_redirect_url]},
+            ) as client:
                 res = client.get(safe_url, headers={"User-Agent": "BrandMonk-AdDesk/2.0"})
                 if res.status_code == 200:
                     html = res.text

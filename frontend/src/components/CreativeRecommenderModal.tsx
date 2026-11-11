@@ -145,13 +145,23 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
         {/* Content Body */}
         <div style={{ padding: 22, overflowY: "auto", flex: 1 }}>
           {isLoading ? (
-            <div style={{ padding: 60, textAlign: "center", color: "var(--muted)" }}>
-              <div style={{ fontSize: 15, marginBottom: 8, color: "var(--ink)", fontWeight: 500 }}>
-                Auditing competitor creative vulnerabilities...
+            <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 20 }}>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="skeleton" style={{ width: 180, height: 20 }} />
+                <div className="skeleton" style={{ width: "100%", height: 180, borderRadius: 6 }} />
+                <div className="skeleton" style={{ width: 120, height: 16 }} />
+                <div className="skeleton" style={{ width: "100%", height: 40 }} />
+                <div className="skeleton" style={{ width: "100%", height: 60 }} />
               </div>
-              <p style={{ fontSize: 13, margin: 0 }}>
-                Synthesizing contrarian hooks, proof contrasts, and Midjourney/Flux production prompts.
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div className="skeleton" style={{ flex: 1, height: 46, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ flex: 1, height: 46, borderRadius: 6 }} />
+                  <div className="skeleton" style={{ flex: 1, height: 46, borderRadius: 6 }} />
+                </div>
+                <div className="skeleton" style={{ width: "100%", height: 90, borderRadius: 6 }} />
+                <div className="skeleton" style={{ width: "100%", height: 220, borderRadius: 6 }} />
+              </div>
             </div>
           ) : errorMsg ? (
             <div style={{ padding: 20, background: "var(--warn-soft)", color: "var(--warn)", borderRadius: 6 }}>
@@ -249,7 +259,19 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
                         setSelectedAngleIndex(idx);
                         setRenderedPosterUrl(null);
                       }}
-                      style={{ fontSize: 12, padding: "6px 12px", flex: 1, textAlign: "center" }}
+                      style={{
+                        fontSize: 12,
+                        minHeight: 46,
+                        height: "auto",
+                        padding: "8px 12px",
+                        lineHeight: 1.35,
+                        flex: 1,
+                        textAlign: "center",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        whiteSpace: "normal",
+                      }}
                     >
                       {angle.angle_name}
                     </button>
@@ -259,23 +281,60 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
                 {/* Strategic Rationale Banner */}
                 <div
                   style={{
-                    padding: 12,
-                    background: "var(--accent-soft)",
+                    padding: "14px 16px",
+                    background: "var(--surface)",
                     borderRadius: 6,
-                    border: "1px solid var(--accent)",
+                    border: "1px solid var(--line)",
+                    borderLeft: "4px solid #0a7c6e",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 6,
+                    gap: 8,
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
-                    WHY THIS OUT-POSITIONS THE COMPETITOR:
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      Strategic positioning advantage
+                    </span>
+                    <span
+                      className="chip"
+                      style={{
+                        fontSize: 11,
+                        background: "var(--canvas)",
+                        color: "var(--ink)",
+                        fontWeight: 600,
+                        border: "1px solid var(--line)",
+                      }}
+                    >
+                      Counter-angle
+                    </span>
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.5, fontWeight: 500 }}>
                     {currentAngle.strategic_rationale}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--accent)", borderTop: "1px dashed var(--accent)", paddingTop: 4, marginTop: 2 }}>
-                    <strong>Backed by approved claim:</strong> "{currentAngle.matching_approved_claim}"
+                  <div
+                    style={{
+                      fontSize: 12,
+                      background: "var(--canvas)",
+                      border: "1px solid var(--line)",
+                      borderRadius: 4,
+                      padding: "8px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ color: "#0a7c6e", fontWeight: 700, fontSize: 13 }}>✓</span>
+                    <span style={{ color: "var(--ink)" }}>
+                      <strong style={{ color: "var(--muted)" }}>Backed by approved claim:</strong> "{currentAngle.matching_approved_claim}"
+                    </span>
                   </div>
                 </div>
 
@@ -445,3 +504,4 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
     </div>
   );
 };
+

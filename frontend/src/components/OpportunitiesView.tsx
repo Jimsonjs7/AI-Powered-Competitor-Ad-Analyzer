@@ -53,7 +53,35 @@ export const OpportunitiesView: React.FC<OpportunitiesViewProps> = ({ onBack }) 
       </div>
 
       {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Analyzing market objections...</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {[1, 2, 3].map((idx) => (
+            <div
+              key={idx}
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--line)",
+                borderRadius: 8,
+                padding: 18,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div className="skeleton" style={{ width: 70, height: 22, borderRadius: 12 }} />
+                    <div className="skeleton" style={{ width: 110, height: 22, borderRadius: 12 }} />
+                  </div>
+                  <div className="skeleton" style={{ width: "60%", height: 20 }} />
+                </div>
+                <div className="skeleton" style={{ width: 140, height: 36, borderRadius: 6 }} />
+              </div>
+              <div className="skeleton" style={{ width: "90%", height: 16 }} />
+              <div className="skeleton" style={{ width: "40%", height: 16 }} />
+            </div>
+          ))}
+        </div>
       ) : opportunities.length === 0 ? (
         <div style={{ padding: 40, background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 8, textAlign: "center" }}>
           <b>No opportunity clusters ready yet.</b>

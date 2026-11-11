@@ -8,6 +8,7 @@ interface AdWallProps {
   selectedAdId: number | null;
   selectedCourse: string;
   sortBy: string;
+  isLoading?: boolean;
   onSelectCourse: (course: string) => void;
   onSelectSort: (sort: string) => void;
   onSelectAd: (adId: number) => void;
@@ -19,6 +20,7 @@ export const AdWall: React.FC<AdWallProps> = ({
   selectedAdId,
   selectedCourse,
   sortBy,
+  isLoading = false,
   onSelectCourse,
   onSelectSort,
   onSelectAd,
@@ -66,7 +68,33 @@ export const AdWall: React.FC<AdWallProps> = ({
       </div>
 
       <div className="gal">
-        {ads.length > 0 ? (
+        {isLoading ? (
+          [1, 2, 3, 4, 5, 6].map((idx) => (
+            <div
+              key={idx}
+              className="tile"
+              style={{
+                background: "var(--surface)",
+                cursor: "default",
+                padding: 10,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div
+                className="skeleton"
+                style={{
+                  width: "100%",
+                  aspectRatio: "4 / 5",
+                  borderRadius: 6,
+                }}
+              />
+              <div className="skeleton" style={{ width: "70%", height: 16 }} />
+              <div className="skeleton" style={{ width: "40%", height: 12 }} />
+            </div>
+          ))
+        ) : ads.length > 0 ? (
           ads.map((ad) => {
             const isSelected = ad.id === selectedAdId;
             const progressPct = Math.min(100, (ad.run_days / 90) * 100);
@@ -81,6 +109,10 @@ export const AdWall: React.FC<AdWallProps> = ({
               >
                 <AdPosterCard ad={ad} />
                 <b>{ad.competitor_name}</b>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "2px 0 3px", fontSize: 11 }}>
+                  <span style={{ color: "var(--accent)", fontWeight: 600 }}>{ad.course}</span>
+                  <span style={{ color: "var(--muted)" }}>{ad.platforms.join("/")}</span>
+                </div>
                 <div className="rl">
                   <i style={{ width: `${progressPct}%` }}></i>
                 </div>

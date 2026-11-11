@@ -6,6 +6,7 @@ interface CompetitorRailProps {
   selectedNames: Set<string>;
   onToggleCompetitor: (name: string, checked: boolean) => void;
   onAddCompetitor: (nameOrUrl: string) => void;
+  onViewCompanyDossier?: (competitorId: number) => void;
 }
 
 export const CompetitorRail: React.FC<CompetitorRailProps> = ({
@@ -13,6 +14,7 @@ export const CompetitorRail: React.FC<CompetitorRailProps> = ({
   selectedNames,
   onToggleCompetitor,
   onAddCompetitor,
+  onViewCompanyDossier,
 }) => {
   const [inputVal, setInputVal] = useState("");
 
@@ -40,7 +42,30 @@ export const CompetitorRail: React.FC<CompetitorRailProps> = ({
                 onChange={(e) => onToggleCompetitor(comp.name, e.target.checked)}
               />
               <div>
-                <b>{comp.name}</b>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <b>{comp.name}</b>
+                  {onViewCompanyDossier && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onViewCompanyDossier(comp.id);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        fontSize: 11,
+                        color: "var(--accent)",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Dossier
+                    </button>
+                  )}
+                </div>
                 <span>
                   {comp.course}, {comp.active_ads_count} active ads
                 </span>

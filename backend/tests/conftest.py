@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -7,7 +8,7 @@ from app.core.migrations import run_migrations
 import app.models  # ensure models are registered
 from app.main import app
 
-TEST_DB_FILE = "/mnt/disk230/Project/Brand Monk/backend/test_isolated.db"
+TEST_DB_FILE = str(Path(__file__).resolve().parent / "test_isolated.db")
 test_engine = create_engine(
     f"sqlite:///{TEST_DB_FILE}",
     connect_args={"check_same_thread": False},

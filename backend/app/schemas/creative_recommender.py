@@ -46,3 +46,4 @@ class CreativeCounterAdResponse(BaseModel):
     angles: List[CounterCreativeAngle]
     recommended_cta: str
     created_at: datetime
+

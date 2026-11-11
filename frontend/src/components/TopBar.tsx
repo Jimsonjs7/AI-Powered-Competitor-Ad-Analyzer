@@ -1,15 +1,16 @@
-import React, { useState } from "react";
-import { DiscoveryModal } from "./DiscoveryModal";
+import React from "react";
 
 interface TopBarProps {
-  currentView: "wall" | "competitors" | "opportunities" | "profile" | "notes";
-  onSelectView: (view: "wall" | "competitors" | "opportunities" | "profile" | "notes") => void;
+  currentView: "wall" | "company" | "competitors" | "opportunities" | "profile" | "notes";
+  onSelectView: (view: "wall" | "company" | "competitors" | "opportunities" | "profile" | "notes") => void;
   statusText: string;
   selectedCity: string;
   onCityChange: (city: string) => void;
   onRefreshAds: () => void;
   isRefreshing: boolean;
   completenessScore?: number;
+  onOpenDiscovery: () => void;
+  isDiscoveryRunning?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -21,15 +22,32 @@ export const TopBar: React.FC<TopBarProps> = ({
   onRefreshAds,
   isRefreshing,
   completenessScore,
+  onOpenDiscovery,
+  isDiscoveryRunning,
 }) => {
-  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
-  const [discoveryMsg, setDiscoveryMsg] = useState("");
-
   return (
     <header className="top" style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 18px", borderBottom: "1px solid var(--line)", background: "var(--surface)" }}>
-      <div className="brand" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => onSelectView("wall")}>
-        <span className="mark">B</span>
-        <span>Ad Desk <span style={{ fontSize: 11, background: "var(--accent-soft)", color: "var(--accent)", padding: "1px 6px", borderRadius: 4 }}>v2</span></span>
+      <div className="brand" style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }} onClick={() => onSelectView("wall")}>
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            background: "#0a7c6e",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+          aria-hidden="true"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+        </div>
+        <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em", color: "var(--ink)" }}>Ad Desk</span>
       </div>
 
       {/* Primary Navigation Tabs */}
@@ -41,6 +59,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           style={{ fontSize: 13, padding: "5px 10px" }}
         >
           Ad Wall
+        </button>
+        <button
+          className="fl"
+          aria-pressed={currentView === "company"}
+          onClick={() => onSelectView("company")}
+          style={{ fontSize: 13, padding: "5px 10px" }}
+        >
+          By Company
         </button>
         <button
           className="fl"
@@ -73,13 +99,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </nav>
 
-      {/* Discovery Status / Feedback */}
-      {discoveryMsg && (
-        <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500 }} role="status">
-          {discoveryMsg}
-        </span>
-      )}
-
       {/* Actions on the right */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
         <span className="src" role="status" style={{ fontSize: 12 }}>
@@ -100,9 +119,20 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           className="btn"
-          onClick={() => setIsDiscoveryModalOpen(true)}
-          style={{ fontSize: 13 }}
+          onClick={onOpenDiscovery}
+          style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}
         >
+          {isDiscoveryRunning && (
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "var(--accent, #15803d)",
+                display: "inline-block",
+              }}
+            />
+          )}
           Find competitors
         </button>
 
@@ -115,19 +145,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           {isRefreshing ? "Refreshing..." : "Refresh ads"}
         </button>
       </div>
-
-      <DiscoveryModal
-        isOpen={isDiscoveryModalOpen}
-        onClose={() => setIsDiscoveryModalOpen(false)}
-        defaultCity={selectedCity}
-        onDiscoveryStarted={() => {
-          setDiscoveryMsg("Discovery scan launched.");
-          setTimeout(() => setDiscoveryMsg(""), 4000);
-        }}
-        onCompetitorAdded={() => {
-          onRefreshAds();
-        }}
-      />
     </header>
   );
 };

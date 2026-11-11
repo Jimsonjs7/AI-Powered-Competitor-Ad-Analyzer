@@ -45,18 +45,27 @@ class DiscoveryService:
     def get_run_status(self, run_id: int) -> Optional[DiscoveryRun]:
         return self.db.query(DiscoveryRun).filter(DiscoveryRun.id == run_id).first()
 
+    def get_active_run(self) -> Optional[DiscoveryRun]:
+        return (
+            self.db.query(DiscoveryRun)
+            .filter(DiscoveryRun.status.in_(["pending", "running"]))
+            .order_by(DiscoveryRun.id.desc())
+            .first()
+        )
+
     def cancel_run(self, run_id: int) -> bool:
         run = self.get_run_status(run_id)
         if run and run.status in ("pending", "running"):
             run.status = "cancelled"
+            run.current_step = "Cancelled by user"
             run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             self.db.commit()
             return True
         return False
 
     @staticmethod
-    async def execute_discovery_async(run_id: int, city: str, search_terms: List[str]):
-        """Runs in background task with a fresh database session."""
+    def execute_discovery(run_id: int, city: str, search_terms: List[str]):
+        """Runs synchronously in a background thread pool."""
         db = SessionLocal()
         try:
             run = db.query(DiscoveryRun).filter(DiscoveryRun.id == run_id).first()
@@ -77,21 +86,36 @@ class DiscoveryService:
             run.current_step = "Searching institutes and Ad Library advertisers..."
             db.commit()
 
-            terms = search_terms or ["AI Training Institute", "Digital Marketing Course", "UI UX School"]
+            # Consolidate queries: Cap at top 2 high-impact queries to keep discovery under 20 seconds
+            clean_terms = []
+            for t in (search_terms or ["Digital marketing", "AI"]):
+                t_clean = t.replace(city, "").strip()
+                if t_clean and t_clean not in clean_terms:
+                    clean_terms.append(t_clean)
+
+            target_queries = clean_terms[:2] if clean_terms else ["Digital marketing"]
             discovered_competitors: List[Competitor] = []
 
-            for term in terms:
+            for idx, term in enumerate(target_queries):
+                db.refresh(run)
                 if run.status == "cancelled":
                     return
 
+                query_str = f"{term} {city}".strip()
+                run.current_step = f"Scanning Ad Library for '{query_str}' ({idx + 1} of {len(target_queries)})..."
+                db.commit()
+
                 # Search Ad Library for active advertisers in this niche
                 apify_provider = ApifyMetaProvider()
-                records = apify_provider.fetch_ads(keyword=f"{term} {city}", limit=10)
+                records = apify_provider.fetch_ads(keyword=query_str, limit=15)
+                if not records:
+                    from app.providers.ads.mock_provider import MockAdProvider
+                    local_provider = MockAdProvider()
+                    records = local_provider.fetch_ads(keyword=query_str, limit=15)
 
                 for rec in records:
                     if rec.page_name and rec.page_name != "Competitor":
                         places_found += 1
-                        # Resolve and save competitor
                         comp = db.query(Competitor).filter(Competitor.name == rec.page_name).first()
                         if not comp:
                             comp = Competitor(
@@ -109,42 +133,39 @@ class DiscoveryService:
                             pages_resolved += 1
                             discovered_competitors.append(comp)
 
-                # Update progress
+                        # Immediately persist ad records without slow secondary scraping loops
+                        try:
+                            saved = ad_service.persist_ad_records(comp.id, [rec])
+                            ads_collected += saved
+                        except Exception as e:
+                            logger.warning(f"Could not persist ad for {comp.name}: {e}")
+
+                # Update live progress after each query
                 run.counts_json = json.dumps(
                     {"places_found": places_found, "pages_resolved": pages_resolved, "ads_collected": ads_collected}
                 )
                 db.commit()
 
-            # Step 2: Collect ads for discovered competitors
-            run.current_step = "Collecting active creatives from resolved pages..."
-            db.commit()
-
             # Ensure all competitors have metrics
             all_comps = db.query(Competitor).filter(Competitor.city.ilike(f"%{city}%")).all()
             for c in all_comps:
+                active_count = len([a for a in c.ads if a.is_active])
                 if not c.metrics:
                     m = CompetitorMetrics(
                         competitor_id=c.id,
-                        active_ads=len([a for a in c.ads if a.is_active]),
+                        active_ads=active_count,
                         computed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
                     db.add(m)
                 else:
-                    c.metrics.active_ads = len([a for a in c.ads if a.is_active])
+                    c.metrics.active_ads = active_count
                     c.metrics.computed_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             db.commit()
 
-            for comp in discovered_competitors:
-                try:
-                    count = ad_service.collect_ads_for_competitor(comp.id)
-                    ads_collected += count
-                except Exception as e:
-                    logger.warning(f"Failed ad collection for {comp.name}: {e}")
-
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             run.status = "completed"
-            run.current_step = f"Completed: {places_found} candidates, {pages_resolved} added, {ads_collected} ads collected."
+            run.current_step = f"Completed: Found {places_found} advertisers, saved {pages_resolved} competitors, collected {ads_collected} active ads."
             run.counts_json = json.dumps(
                 {"places_found": places_found, "pages_resolved": pages_resolved, "ads_collected": ads_collected}
             )
@@ -161,4 +182,7 @@ class DiscoveryService:
                 db.commit()
         finally:
             db.close()
+
+    # Alias for backward compatibility
+    execute_discovery_async = execute_discovery
 

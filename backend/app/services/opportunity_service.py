@@ -36,28 +36,88 @@ class OpportunityService:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         clusters = []
 
-        for category, total_count, comp_count, avg_sev in rows:
-            label = self._label_for_category(category)
-            intensity = round(float(total_count or 0) * float(avg_sev or 1) * (1.0 + (comp_count or 1) * 0.25), 1)
+        if rows:
+            for category, total_count, comp_count, avg_sev in rows:
+                label = self._label_for_category(category)
+                intensity = round(float(total_count or 0) * float(avg_sev or 1) * (1.0 + (comp_count or 1) * 0.25), 1)
 
-            existing = self.db.query(ObjectionCluster).filter(ObjectionCluster.category == category).first()
-            if existing:
-                existing.total_count = int(total_count or 0)
-                existing.competitor_count = int(comp_count or 0)
-                existing.intensity = intensity
-                existing.label = label
-                clusters.append(existing)
-            else:
-                cluster = ObjectionCluster(
-                    label=label,
-                    category=category,
-                    total_count=int(total_count or 0),
-                    competitor_count=int(comp_count or 0),
-                    intensity=intensity,
-                    created_at=now,
-                )
-                self.db.add(cluster)
-                clusters.append(cluster)
+                existing = self.db.query(ObjectionCluster).filter(ObjectionCluster.category == category).first()
+                if existing:
+                    existing.total_count = int(total_count or 0)
+                    existing.competitor_count = int(comp_count or 0)
+                    existing.intensity = intensity
+                    existing.label = label
+                    clusters.append(existing)
+                else:
+                    cluster = ObjectionCluster(
+                        label=label,
+                        category=category,
+                        total_count=int(total_count or 0),
+                        competitor_count=int(comp_count or 0),
+                        intensity=intensity,
+                        created_at=now,
+                    )
+                    self.db.add(cluster)
+                    clusters.append(cluster)
+        else:
+            # Fallback: derive market objection clusters directly from active ads & ad analyses
+            from app.models.ad import Ad
+            from app.models.analysis import AdAnalysis
+
+            ads = self.db.query(Ad).filter(Ad.is_active == True).all()
+            if ads:
+                cat_stats = {
+                    "pricing_clarity": {"evidence": 0, "comps": set()},
+                    "placement_claims": {"evidence": 0, "comps": set()},
+                    "schedule_clarity": {"evidence": 0, "comps": set()},
+                    "trust_proof": {"evidence": 0, "comps": set()},
+                }
+                for ad in ads:
+                    copy_l = (ad.copy or "").lower()
+                    weak_l = ""
+                    if ad.analysis and ad.analysis.weaknesses:
+                        weak_l = ad.analysis.weaknesses.lower()
+
+                    if not any(k in copy_l for k in ["₹", "fee", "cost", "price", "emi"]) or any(k in weak_l for k in ["fee", "price", "cost"]):
+                        cat_stats["pricing_clarity"]["evidence"] += 1
+                        cat_stats["pricing_clarity"]["comps"].add(ad.competitor_id)
+
+                    if not any(k in copy_l for k in ["salary", "hired", "alumni", "partner"]) or any(k in weak_l for k in ["proof", "placement", "salary"]):
+                        cat_stats["placement_claims"]["evidence"] += 1
+                        cat_stats["placement_claims"]["comps"].add(ad.competitor_id)
+
+                    if not any(k in copy_l for k in ["batch", "timing", "weekend", "starts on"]) or any(k in weak_l for k in ["date", "batch", "size"]):
+                        cat_stats["schedule_clarity"]["evidence"] += 1
+                        cat_stats["schedule_clarity"]["comps"].add(ad.competitor_id)
+
+                    if any(k in weak_l for k in ["trust", "proof", "names", "generic", "learn"]) or not copy_l:
+                        cat_stats["trust_proof"]["evidence"] += 1
+                        cat_stats["trust_proof"]["comps"].add(ad.competitor_id)
+
+                for cat, stat in cat_stats.items():
+                    evidence_cnt = max(stat["evidence"], 1)
+                    comp_cnt = max(len(stat["comps"]), 1)
+                    label = self._label_for_category(cat)
+                    intensity = round(float(evidence_cnt) * 1.5 * (1.0 + comp_cnt * 0.25), 1)
+
+                    existing = self.db.query(ObjectionCluster).filter(ObjectionCluster.category == cat).first()
+                    if existing:
+                        existing.total_count = evidence_cnt
+                        existing.competitor_count = comp_cnt
+                        existing.intensity = intensity
+                        existing.label = label
+                        clusters.append(existing)
+                    else:
+                        cluster = ObjectionCluster(
+                            label=label,
+                            category=cat,
+                            total_count=evidence_cnt,
+                            competitor_count=comp_cnt,
+                            intensity=intensity,
+                            created_at=now,
+                        )
+                        self.db.add(cluster)
+                        clusters.append(cluster)
 
         self.db.commit()
         return clusters

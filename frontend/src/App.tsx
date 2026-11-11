@@ -7,23 +7,33 @@ import { DesignNotes } from "./components/DesignNotes";
 import { ProfileView } from "./components/ProfileView";
 import { OpportunitiesView } from "./components/OpportunitiesView";
 import { CompetitorTableView } from "./components/CompetitorTableView";
-import { Ad, Competitor, MarketInsight } from "./types";
+import { CompanyAdView } from "./components/CompanyAdView";
+import { DiscoveryModal } from "./components/DiscoveryModal";
+import { BackgroundQueueBanner } from "./components/BackgroundQueueBanner";
+import { Ad, Competitor, DiscoveryStatus, MarketInsight } from "./types";
 import {
   addCompetitor,
+  cancelDiscovery,
+  fetchActiveDiscovery,
   fetchAds,
   fetchCompetitors,
+  fetchDiscoveryStatus,
   fetchHealth,
   fetchMarketInsights,
   fetchProfileCompleteness,
   refreshAds,
+  startDiscovery,
 } from "./api/client";
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<"wall" | "competitors" | "opportunities" | "profile" | "notes">("wall");
+  const [currentView, setCurrentView] = useState<"wall" | "company" | "competitors" | "opportunities" | "profile" | "notes">("wall");
   const [city, setCity] = useState("Coimbatore");
+  const [focusedCompanyId, setFocusedCompanyId] = useState<number | null>(null);
   const [statusText, setStatusText] = useState("All 3 ad sources responding");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [completenessScore, setCompletenessScore] = useState<number>(0);
+  const [isDiscoveryModalOpen, setIsDiscoveryModalOpen] = useState(false);
+  const [activeDiscoveryRun, setActiveDiscoveryRun] = useState<DiscoveryStatus | null>(null);
 
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [selectedCompetitorNames, setSelectedCompetitorNames] = useState<Set<string>>(
@@ -31,6 +41,7 @@ export const App: React.FC = () => {
   );
 
   const [ads, setAds] = useState<Ad[]>([]);
+  const [isLoadingAds, setIsLoadingAds] = useState(false);
   const [marketInsight, setMarketInsight] = useState<MarketInsight | null>(null);
   const [selectedCourse, setSelectedCourse] = useState("All");
   const [sortBy, setSortBy] = useState("days");
@@ -84,6 +95,7 @@ export const App: React.FC = () => {
 
   // Load ads
   const loadAds = useCallback(() => {
+    setIsLoadingAds(true);
     fetchAds({
       course: selectedCourse,
       sortBy: sortBy,
@@ -99,6 +111,9 @@ export const App: React.FC = () => {
       })
       .catch((err) => {
         console.error("Failed to load ads:", err);
+      })
+      .finally(() => {
+        setIsLoadingAds(false);
       });
   }, [selectedCourse, sortBy, selectedCompetitorNames, selectedAdId]);
 
@@ -139,6 +154,77 @@ export const App: React.FC = () => {
       console.error("Refresh failed:", err);
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  // Check for in-flight discovery run on mount
+  useEffect(() => {
+    fetchActiveDiscovery()
+      .then((run) => {
+        if (run && (run.status === "running" || run.status === "pending")) {
+          setActiveDiscoveryRun(run);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Poll in-flight discovery run in background
+  useEffect(() => {
+    if (!activeDiscoveryRun || (activeDiscoveryRun.status !== "running" && activeDiscoveryRun.status !== "pending")) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await fetchDiscoveryStatus(activeDiscoveryRun.run_id);
+        setActiveDiscoveryRun(status);
+        if (status.status === "completed") {
+          clearInterval(interval);
+          loadCompetitors();
+          loadAds();
+          loadMarketInsights();
+          loadCompleteness();
+        } else if (status.status === "failed" || status.status === "cancelled") {
+          clearInterval(interval);
+        }
+      } catch (err) {
+        console.error("Discovery polling error:", err);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [activeDiscoveryRun?.run_id, activeDiscoveryRun?.status, loadCompetitors, loadAds, loadMarketInsights]);
+
+  const handleStartDiscovery = async (payload: {
+    radius_km: number;
+    city: string;
+    areas: string[];
+    domains: string[];
+    search_terms: string[];
+  }) => {
+    const res = await startDiscovery(payload);
+    const initialStatus: DiscoveryStatus = {
+      run_id: res.run_id,
+      status: "running",
+      current_step: "Initializing competitor discovery agent...",
+      radius_km: payload.radius_km,
+      counts: { places_found: 0, pages_resolved: 0, ads_collected: 0 },
+      started_at: new Date().toISOString(),
+    };
+    setActiveDiscoveryRun(initialStatus);
+    return res.run_id;
+  };
+
+  const handleCancelDiscovery = async (runId: number) => {
+    try {
+      await cancelDiscovery(runId);
+      setActiveDiscoveryRun((prev) =>
+        prev && prev.run_id === runId
+          ? { ...prev, status: "cancelled", current_step: "Scan cancelled by user" }
+          : null
+      );
+    } catch (err) {
+      console.error("Cancel discovery error:", err);
     }
   };
 
@@ -193,6 +279,36 @@ export const App: React.FC = () => {
         onRefreshAds={handleRefreshAds}
         isRefreshing={isRefreshing}
         completenessScore={completenessScore}
+        onOpenDiscovery={() => setIsDiscoveryModalOpen(true)}
+        isDiscoveryRunning={Boolean(
+          activeDiscoveryRun &&
+            (activeDiscoveryRun.status === "running" || activeDiscoveryRun.status === "pending")
+        )}
+      />
+
+      <BackgroundQueueBanner
+        run={activeDiscoveryRun}
+        onOpenDetails={() => setIsDiscoveryModalOpen(true)}
+        onCancel={() => activeDiscoveryRun && handleCancelDiscovery(activeDiscoveryRun.run_id)}
+        onDismiss={() => setActiveDiscoveryRun(null)}
+        onViewCompetitors={() => {
+          setCurrentView("competitors");
+          setActiveDiscoveryRun(null);
+        }}
+      />
+
+      <DiscoveryModal
+        isOpen={isDiscoveryModalOpen}
+        onClose={() => setIsDiscoveryModalOpen(false)}
+        defaultCity={city}
+        activeRun={activeDiscoveryRun}
+        onStartDiscovery={handleStartDiscovery}
+        onCancelDiscovery={handleCancelDiscovery}
+        onCompetitorAdded={() => {
+          loadCompetitors();
+          loadAds();
+          loadMarketInsights();
+        }}
       />
 
       {currentView === "profile" && (
@@ -204,6 +320,20 @@ export const App: React.FC = () => {
 
       {currentView === "opportunities" && (
         <OpportunitiesView onBack={() => setCurrentView("wall")} />
+      )}
+
+      {currentView === "company" && (
+        <CompanyAdView
+          competitors={competitors}
+          ads={ads}
+          initialCompanyId={focusedCompanyId}
+          onBackToWall={() => setCurrentView("wall")}
+          onSelectAdForPoster={(ad) => {
+            setSelectedAdId(ad.id);
+            setCurrentView("wall");
+            setIsPaneOpen(true);
+          }}
+        />
       )}
 
       {currentView === "competitors" && (
@@ -225,6 +355,10 @@ export const App: React.FC = () => {
             selectedNames={selectedCompetitorNames}
             onToggleCompetitor={handleToggleCompetitor}
             onAddCompetitor={handleAddCompetitor}
+            onViewCompanyDossier={(compId) => {
+              setFocusedCompanyId(compId);
+              setCurrentView("company");
+            }}
           />
 
           <AdWall
@@ -233,6 +367,7 @@ export const App: React.FC = () => {
             selectedAdId={selectedAdId}
             selectedCourse={selectedCourse}
             sortBy={sortBy}
+            isLoading={isLoadingAds || isRefreshing}
             onSelectCourse={setSelectedCourse}
             onSelectSort={setSortBy}
             onSelectAd={handleSelectAd}

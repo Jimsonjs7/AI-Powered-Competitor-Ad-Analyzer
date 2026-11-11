@@ -219,6 +219,20 @@ export async function fetchDiscoveryStatus(runId: number): Promise<DiscoveryStat
   return res.json();
 }
 
+export async function fetchActiveDiscovery(): Promise<DiscoveryStatus | null> {
+  const res = await fetch(`${API_BASE}/discovery/active`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function cancelDiscovery(runId: number): Promise<{ status: string; run_id: number }> {
+  const res = await fetch(`${API_BASE}/discovery/${runId}/cancel`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to cancel discovery run");
+  return res.json();
+}
+
 // Phase D & E: Evidence & Weakness APIs
 export async function fetchCompetitorWeaknesses(competitorId: number): Promise<{
   competitor_id: number;

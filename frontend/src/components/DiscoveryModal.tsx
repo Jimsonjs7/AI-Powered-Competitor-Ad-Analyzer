@@ -1,12 +1,20 @@
 import React, { useState } from "react";
-import { addCompetitor, crawlCompetitorWebsite, fetchDiscoveryStatus, startDiscovery } from "../api/client";
+import { addCompetitor, crawlCompetitorWebsite } from "../api/client";
 import { CompetitorCrawlResult, DiscoveryStatus } from "../types";
 
 interface DiscoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultCity: string;
-  onDiscoveryStarted?: () => void;
+  activeRun: DiscoveryStatus | null;
+  onStartDiscovery: (payload: {
+    radius_km: number;
+    city: string;
+    areas: string[];
+    domains: string[];
+    search_terms: string[];
+  }) => Promise<number>;
+  onCancelDiscovery: (runId: number) => Promise<void>;
   onCompetitorAdded?: () => void;
 }
 
@@ -14,7 +22,9 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
   isOpen,
   onClose,
   defaultCity,
-  onDiscoveryStarted,
+  activeRun,
+  onStartDiscovery,
+  onCancelDiscovery,
   onCompetitorAdded,
 }) => {
   const [activeTab, setActiveTab] = useState<"area_scan" | "website_crawl">("area_scan");
@@ -31,9 +41,7 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
   ]);
   const [customKeyword, setCustomKeyword] = useState("");
   const [radiusKm, setRadiusKm] = useState(15);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState<DiscoveryStatus | null>(null);
-  const [scanMsg, setScanMsg] = useState("");
+  const [scanError, setScanError] = useState("");
 
   // Tab 2: Website crawl states
   const [crawlUrl, setCrawlUrl] = useState("");
@@ -52,6 +60,8 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
   const [saveCompSuccess, setSaveCompSuccess] = useState("");
 
   if (!isOpen) return null;
+
+  const isScanning = Boolean(activeRun && (activeRun.status === "running" || activeRun.status === "pending"));
 
   const toggleDomain = (domain: string) => {
     setSelectedDomains((prev) =>
@@ -72,48 +82,25 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
   };
 
   const handleStartAreaScan = async () => {
-    setIsScanning(true);
-    setScanMsg("Initializing competitor discovery agent...");
+    setScanError("");
     try {
       const searchTerms: string[] = [];
       if (customKeyword.trim()) {
         searchTerms.push(customKeyword.trim());
       }
-      for (const domain of selectedDomains) {
-        for (const area of selectedAreas) {
-          searchTerms.push(`${domain} ${area}`);
-        }
+      for (const domain of selectedDomains.slice(0, 2)) {
         searchTerms.push(`${domain} institute`);
       }
 
-      const res = await startDiscovery({
+      await onStartDiscovery({
         radius_km: radiusKm,
         city,
         areas: selectedAreas,
         domains: selectedDomains,
         search_terms: searchTerms,
       });
-
-      setScanMsg(`Agent started (Run #${res.run_id}). Monitoring active sources...`);
-      onDiscoveryStarted?.();
-
-      // Poll status for a short while
-      const pollTimer = setInterval(async () => {
-        try {
-          const status = await fetchDiscoveryStatus(res.run_id);
-          setScanStatus(status);
-          if (status.status === "completed" || status.status === "failed") {
-            clearInterval(pollTimer);
-            setIsScanning(false);
-          }
-        } catch {
-          clearInterval(pollTimer);
-          setIsScanning(false);
-        }
-      }, 3000);
     } catch (err: any) {
-      setScanMsg(err.message || "Failed to start discovery scan.");
-      setIsScanning(false);
+      setScanError(err.message || "Failed to start discovery scan.");
     }
   };
 
@@ -349,26 +336,100 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
               />
             </div>
 
-            {/* Scan Status / Feedback */}
-            {scanMsg && (
-              <div style={{ padding: 12, background: "var(--canvas)", borderRadius: 6, fontSize: 13, color: "var(--accent)" }}>
-                {scanMsg}
-                {scanStatus && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "var(--ink)" }}>
-                    Step: {scanStatus.current_step} | Found: {scanStatus.counts?.places_found || 0} competitors | Ads checked: {scanStatus.counts?.ads_collected || 0}
-                  </div>
-                )}
+            {/* Active Running Card or Error Feedback */}
+            {isScanning && activeRun && (
+              <div
+                style={{
+                  padding: 14,
+                  background: "var(--accent-soft, #f0fdf4)",
+                  border: "1px solid var(--accent, #15803d)",
+                  borderRadius: 6,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontWeight: 600, color: "var(--accent, #15803d)", fontSize: 13 }}>
+                    Discovery Agent Active (Run #{activeRun.run_id})
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      background: "var(--accent, #15803d)",
+                      color: "#fff",
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                    }}
+                  >
+                    Running in background
+                  </span>
+                </div>
+
+                <div style={{ fontSize: 13, color: "var(--ink, #0f172a)" }}>
+                  {activeRun.current_step || "Scanning Ad Library..."}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    fontSize: 12,
+                    color: "var(--ink-muted, #475569)",
+                    background: "rgba(255,255,255,0.7)",
+                    padding: "6px 10px",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span>Advertisers: <b>{activeRun.counts?.places_found || 0}</b></span>
+                  <span>·</span>
+                  <span>Competitors: <b>{activeRun.counts?.pages_resolved || 0}</b></span>
+                  <span>·</span>
+                  <span>Ads: <b>{activeRun.counts?.ads_collected || 0}</b></span>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  <button
+                    className="btn pri"
+                    onClick={onClose}
+                    style={{ flex: 1, padding: "8px 12px", fontSize: 13 }}
+                  >
+                    Run in background & close
+                  </button>
+                  <button
+                    onClick={() => onCancelDiscovery(activeRun.run_id)}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid #fca5a5",
+                      color: "#b91c1c",
+                      padding: "8px 12px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    Cancel scan
+                  </button>
+                </div>
               </div>
             )}
 
-            <button
-              className="btn pri"
-              disabled={isScanning || selectedDomains.length === 0}
-              onClick={handleStartAreaScan}
-              style={{ padding: "10px 16px", fontSize: 14 }}
-            >
-              {isScanning ? "Scanning area sources..." : "Start Competitor Discovery Scan"}
-            </button>
+            {scanError && (
+              <div style={{ padding: 12, background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", borderRadius: 6, fontSize: 13 }}>
+                {scanError}
+              </div>
+            )}
+
+            {!isScanning && (
+              <button
+                className="btn pri"
+                disabled={selectedDomains.length === 0}
+                onClick={handleStartAreaScan}
+                style={{ padding: "10px 16px", fontSize: 14 }}
+              >
+                Start Competitor Discovery Scan
+              </button>
+            )}
           </div>
         )}
 
