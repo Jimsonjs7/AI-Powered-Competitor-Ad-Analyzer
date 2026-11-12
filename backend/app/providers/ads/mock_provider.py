@@ -168,5 +168,148 @@ class MockAdProvider(AdSource):
             results.append(record)
             if len(results) >= limit:
                 break
+
+        # Fallback: if no hardcoded seed ad matched, synthesize contextual active ads for this competitor
+        if not results and page_id and page_id != "all":
+            results.extend(self._create_contextual_ads(page_id, keyword))
+
         return results
+
+    def _create_contextual_ads(self, page_id: str, keyword: Optional[str]) -> List[AdRecord]:
+        import re
+        from urllib.parse import urlparse
+
+        clean_name = page_id.replace("page_", "").replace("_", " ").title()
+        if clean_name.startswith("Http"):
+            clean_name = urlparse(page_id).netloc.replace("www.", "").split(".")[0].title()
+
+        slug = re.sub(r"[^a-zA-Z0-9]+", "_", clean_name.lower()).strip("_")
+        course = (keyword or "Digital marketing").title()
+
+        if "Ai" in course or "Artificial" in course:
+            ad_defs = [
+                {
+                    "copy": f"Transform your career with advanced Artificial Intelligence training at {clean_name}. Hands-on prompt engineering, Python, and generative models with dedicated placement assistance in Coimbatore. Reserve your free demo seat today.",
+                    "headline": f"Master Generative AI at {clean_name}",
+                    "cta": "Apply now",
+                    "days": 21,
+                    "img": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80",
+                    "hook": "High-demand skill career transition",
+                    "offer": "Free interactive demo class & curriculum review",
+                    "audience": "Developers, engineering graduates, and career switchers",
+                    "tactics": ["Career growth", "Hands-on projects", "Demo offer"],
+                    "why": f"{clean_name} appeals to learners seeking high-growth AI roles by promising practical project work and job readiness.",
+                    "weak": "Does not outline prerequisites or publish verified mentor credentials.",
+                    "score": 76,
+                    "opportunity": "Show BrandMonk's certified agency practitioners and 1-on-1 portfolio coaching.",
+                },
+                {
+                    "copy": f"Fast-track your AI mastery in 12 weeks. Build production-ready LLM agents and machine learning pipelines with live mentor reviews at {clean_name}. Limited batch size.",
+                    "headline": "12-Week AI Intensive Cohort",
+                    "cta": "Download syllabus",
+                    "days": 11,
+                    "img": "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&q=80",
+                    "hook": "Time-bounded cohort curriculum",
+                    "offer": "Syllabus download & career counseling",
+                    "audience": "Working professionals seeking upskilling",
+                    "tactics": ["Fixed duration", "Urgency", "Outcome promise"],
+                    "why": f"{clean_name} emphasizes structured weekly milestones to reduce learning overwhelm.",
+                    "weak": "Course fee and batch schedule are hidden behind a lead form.",
+                    "score": 72,
+                    "opportunity": "Emphasize BrandMonk's 100% upfront fee disclosure with zero hidden charges.",
+                }
+            ]
+        elif "Ui" in course or "Design" in course:
+            ad_defs = [
+                {
+                    "copy": f"Design world-class apps and websites. Master Figma, product research, and design systems at {clean_name} in Coimbatore. Graduate with 3 client-ready portfolio case studies.",
+                    "headline": f"UI/UX Design Program at {clean_name}",
+                    "cta": "View portfolio projects",
+                    "days": 19,
+                    "img": "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=800&q=80",
+                    "hook": "Portfolio-first hiring proof",
+                    "offer": "3 complete portfolio case studies",
+                    "audience": "Aspiring product designers and creative graduates",
+                    "tactics": ["Portfolio proof", "Figma mastery", "Mentor feedback"],
+                    "why": f"{clean_name} focuses on the tangible portfolio deliverable that design employers require.",
+                    "weak": "Does not showcase student success rates or real alumni work.",
+                    "score": 74,
+                    "opportunity": "Highlight BrandMonk's live design critiques and verified student portfolios.",
+                }
+            ]
+        else:
+            ad_defs = [
+                {
+                    "copy": f"Scale your career and business with results-driven Digital Marketing at {clean_name}. Master Meta Ads, Google PPC, SEO, and live client campaign budgets in Coimbatore. Get certified today.",
+                    "headline": f"Performance Marketing Mastery with {clean_name}",
+                    "cta": "Book free demo",
+                    "days": 27,
+                    "img": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+                    "hook": "Direct ROI & practical campaign execution",
+                    "offer": "Live ad spend budget managed during course",
+                    "audience": "Marketing freshers, entrepreneurs, and business owners",
+                    "tactics": ["Live budgets", "Agency authority", "Free demo"],
+                    "why": f"{clean_name} attracts students by offering live advertising budgets to manage rather than just theory.",
+                    "weak": "Fees and batch start dates are not listed upfront.",
+                    "score": 77,
+                    "opportunity": "Promote BrandMonk's published transparent pricing and small batch caps.",
+                },
+                {
+                    "copy": f"Become a certified digital marketer in Coimbatore. 100% practical training covering Social Media Marketing, Content Strategy, and Analytics with {clean_name}. Weekend batches available.",
+                    "headline": "Weekend Digital Marketing Cohort",
+                    "cta": "Enroll now",
+                    "days": 14,
+                    "img": "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&q=80",
+                    "hook": "Flexible weekend schedule for working professionals",
+                    "offer": "Weekend batch option & certification",
+                    "audience": "Working professionals and job seekers",
+                    "tactics": ["Schedule flexibility", "Comprehensive syllabus", "Local relevance"],
+                    "why": f"{clean_name} removes the time objection for employed candidates by offering weekend sessions.",
+                    "weak": "Generic stock visual without actual classroom or mentor footage.",
+                    "score": 68,
+                    "opportunity": "Showcase BrandMonk's live agency mentor recordings and transparent conversion reporting.",
+                }
+            ]
+
+        contextual_records = []
+        for i, ad in enumerate(ad_defs):
+            archive_id = f"meta_archive_{slug}_{i + 1}"
+            raw = {
+                "ad_archive_id": archive_id,
+                "page_id": page_id,
+                "page_name": clean_name,
+                "course": course,
+                "days": ad["days"],
+                "copy": ad["copy"],
+                "headline": ad["headline"],
+                "cta": ad["cta"],
+                "platforms": ["facebook", "instagram"],
+                "start_date": "2026-10-20",
+                "media_url": ad["img"],
+                "hook": ad["hook"],
+                "offer": ad["offer"],
+                "audience": ad["audience"],
+                "tactics": ad["tactics"],
+                "why": ad["why"],
+                "weak": ad["weak"],
+                "score": ad["score"],
+                "opportunity": ad["opportunity"],
+            }
+            rec = AdRecord(
+                ad_archive_id=archive_id,
+                page_id=page_id,
+                page_name=clean_name,
+                source=self.name,
+                copy=ad["copy"],
+                headline=ad["headline"],
+                cta=ad["cta"],
+                platforms=["facebook", "instagram"],
+                start_date="2026-10-20",
+                is_active=True,
+                media=[MediaItem(type="image", url=ad["img"])],
+                language="en",
+                raw=raw,
+            )
+            contextual_records.append(rec)
+        return contextual_records
 

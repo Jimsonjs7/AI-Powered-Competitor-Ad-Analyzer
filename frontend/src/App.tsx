@@ -134,12 +134,16 @@ export const App: React.FC = () => {
   };
 
   const handleAddCompetitor = async (nameOrUrl: string) => {
+    setIsRefreshing(true);
     try {
       await addCompetitor({ name: nameOrUrl, city });
       loadCompetitors();
+      loadAds();
       loadMarketInsights();
     } catch (err) {
       console.error("Add competitor failed:", err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -328,6 +332,8 @@ export const App: React.FC = () => {
           ads={ads}
           initialCompanyId={focusedCompanyId}
           onBackToWall={() => setCurrentView("wall")}
+          onRefreshAds={handleRefreshAds}
+          isRefreshing={isRefreshing}
           onSelectAdForPoster={(ad) => {
             setSelectedAdId(ad.id);
             setCurrentView("wall");

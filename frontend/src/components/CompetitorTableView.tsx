@@ -292,13 +292,6 @@ export const CompetitorTableView: React.FC<CompetitorTableViewProps> = ({
                       >
                         Inspect & Ads
                       </button>
-                      <button
-                        className="btn"
-                        style={{ fontSize: 12, padding: "3px 8px" }}
-                        onClick={() => setEvidenceCompId(comp.id)}
-                      >
-                        Add Evidence
-                      </button>
                     </div>
                   </td>
                 </tr>

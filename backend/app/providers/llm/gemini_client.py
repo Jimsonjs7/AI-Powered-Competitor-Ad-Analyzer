@@ -11,7 +11,7 @@ logger = get_logger("provider.llm.gemini")
 
 
 class GeminiLLMClient(LLMClient):
-    name = "gemini-3.5-flash-lite"
+    name = "gemini-flash-latest"
 
     def __init__(self, api_keys: Optional[List[str]] = None):
         self.api_keys = api_keys or settings.all_gemini_api_keys

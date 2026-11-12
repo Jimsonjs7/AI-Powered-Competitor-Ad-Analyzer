@@ -196,31 +196,62 @@ class CompetitorService:
         return results
 
     def create_competitor(self, data: CompetitorCreate) -> Competitor:
-        existing = self.db.query(Competitor).filter(Competitor.name == data.name).first()
-        if existing:
-            return existing
-
-        resolved_page_id = data.fb_page_id
+        comp_name = data.name.strip()
+        comp_city = data.city.strip() if data.city else "Coimbatore"
+        comp_course = data.course or "Digital marketing"
+        comp_website = data.website
+        comp_area = data.area
+        comp_fb_page_id = data.fb_page_id
+        comp_ig_handle = data.ig_handle
         confidence = ConfidenceLevel.high.value
 
-        if not resolved_page_id:
-            resolved = self.resolve_page_id(data.fb_page_url or data.name)
-            resolved_page_id = resolved.resolved_page_id
+        # Auto-detect if name or website is a website URL
+        input_is_url = comp_name.startswith("http://") or comp_name.startswith("https://")
+        if input_is_url and not any(d in comp_name.lower() for d in ["facebook.com", "instagram.com"]):
+            comp_website = comp_name
+            try:
+                crawl_res = self.crawl_competitor_website(comp_website)
+                comp_name = crawl_res.name
+                comp_course = crawl_res.course or comp_course
+                comp_city = crawl_res.city or comp_city
+                comp_area = crawl_res.area or comp_area
+                comp_fb_page_id = crawl_res.fb_page_id or comp_fb_page_id
+                comp_ig_handle = crawl_res.ig_handle or comp_ig_handle
+            except Exception as e:
+                logger.warning(f"Auto-crawl for competitor URL {comp_website} failed: {e}")
+
+        # Check for existing competitor by name or website
+        existing = self.db.query(Competitor).filter(
+            (Competitor.name == comp_name) | 
+            (Competitor.website == comp_website if comp_website else False)
+        ).first()
+        if existing:
+            # Refresh/collect ads if empty
+            try:
+                from app.services.ad_service import AdService
+                AdService(self.db).collect_ads_for_competitor(existing.id)
+            except Exception as e:
+                logger.warning(f"Ad collection for existing competitor {existing.name} failed: {e}")
+            return existing
+
+        if not comp_fb_page_id:
+            resolved = self.resolve_page_id(data.fb_page_url or comp_name)
+            comp_fb_page_id = resolved.resolved_page_id
             confidence = resolved.confidence.value
 
         competitor = Competitor(
-            name=data.name,
-            city=data.city,
-            course=data.course,
-            website=data.website,
-            fb_page_id=resolved_page_id,
+            name=comp_name,
+            city=comp_city,
+            course=comp_course,
+            website=comp_website,
+            fb_page_id=comp_fb_page_id,
             confidence=confidence,
             lat=data.lat,
             lng=data.lng,
             distance_km=data.distance_km,
-            area=data.area,
-            ig_handle=data.ig_handle,
-            data_status="pending",
+            area=comp_area,
+            ig_handle=comp_ig_handle,
+            data_status="ready",
             is_active=True,
         )
         self.db.add(competitor)
@@ -231,6 +262,15 @@ class CompetitorService:
         metrics = CompetitorMetrics(competitor_id=competitor.id)
         self.db.add(metrics)
         self.db.commit()
+
+        # Immediately collect ads for newly created competitor
+        try:
+            from app.services.ad_service import AdService
+            ad_service = AdService(self.db)
+            ad_service.collect_ads_for_competitor(competitor.id)
+            self.db.refresh(competitor)
+        except Exception as e:
+            logger.warning(f"Immediate ad collection for new competitor {competitor.name} failed: {e}")
 
         return competitor
 
@@ -278,6 +318,19 @@ class CompetitorService:
                     desc_match = re.search(r'<meta\s+name=["\']description["\']\s+content=["\'](.*?)["\']', html, re.IGNORECASE | re.DOTALL)
                     if desc_match:
                         description = desc_match.group(1).strip()
+
+                    # If extracted name contains generic SEO phrases, derive true brand name
+                    seo_indicator_words = ["best ", "top ", "leading ", "company in", "agency in", "services in", "institute in", "training in", "academy in"]
+                    if any(ind in name.lower() for ind in seo_indicator_words) or name == "Competitor":
+                        desc_match_brand = re.search(r'([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+){0,2})\s+(?:is|provides|offers|leads|delivers)', description or "")
+                        if desc_match_brand and not any(w in desc_match_brand.group(1).lower() for w in ["best", "top", "leading"]):
+                            name = desc_match_brand.group(1).strip()
+                        else:
+                            netloc = urlparse(safe_url).netloc.lower().replace("www.", "")
+                            domain_base = netloc.split(".")[0]
+                            clean_domain = re.sub(r'([a-z])([A-Z])', r'\1 \2', domain_base).title()
+                            if len(clean_domain) > 2:
+                                name = clean_domain
 
                     combined = f"{raw_title if 'raw_title' in locals() else ''} {description or ''} {html[:5000]}"
 

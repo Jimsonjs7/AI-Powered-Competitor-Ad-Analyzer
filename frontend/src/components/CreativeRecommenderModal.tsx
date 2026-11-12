@@ -21,6 +21,7 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
   const [selectedAngleIndex, setSelectedAngleIndex] = useState(0);
   const [selectedRatio, setSelectedRatio] = useState<"1:1" | "4:5" | "9:16">("1:1");
   const [copyFeedback, setCopyFeedback] = useState("");
+  const [promptCopyFeedback, setPromptCopyFeedback] = useState("");
 
   // Poster render state
   const [isRenderingPoster, setIsRenderingPoster] = useState(false);
@@ -53,13 +54,25 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
 
   const currentAngle = data ? data.angles[selectedAngleIndex] : null;
 
-  const handleCopyText = async (text: string, label: string) => {
+  const handleCopyText = async (text: string, label: string, isPrompt = false) => {
+    const setFeedback = isPrompt ? setPromptCopyFeedback : setCopyFeedback;
     try {
-      await navigator.clipboard.writeText(text);
-      setCopyFeedback(`Copied ${label}.`);
-      setTimeout(() => setCopyFeedback(""), 2500);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setFeedback(`✓ Copied ${label}.`);
+      setTimeout(() => setFeedback(""), 2500);
     } catch {
-      setCopyFeedback("Copy failed.");
+      setFeedback("Copy failed. Please copy manually.");
     }
   };
 
@@ -77,7 +90,7 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
         custom_subline: currentAngle.subline,
         custom_cta: currentAngle.cta_text,
       });
-      setRenderedPosterUrl(res.image_url);
+      setRenderedPosterUrl(`${res.image_url}?t=${Date.now()}`);
       setRenderStatus("Branded poster rendered successfully.");
     } catch {
       setRenderStatus("Rendering failed. Verify image generation service.");
@@ -459,12 +472,13 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
                       onClick={() =>
                         handleCopyText(
                           currentAngle.aspect_ratios[selectedRatio] || currentAngle.image_prompt,
-                          "AI image prompt"
+                          "Midjourney / Flux prompt",
+                          true
                         )
                       }
                       style={{ fontSize: 12 }}
                     >
-                      Copy Midjourney / Flux Prompt
+                      {promptCopyFeedback ? "✓ Copied Prompt" : "Copy Midjourney / Flux Prompt"}
                     </button>
 
                     <button
@@ -477,9 +491,18 @@ export const CreativeRecommenderModal: React.FC<CreativeRecommenderModalProps> =
                     </button>
                   </div>
 
-                  {renderStatus && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: "var(--accent)" }}>
-                      {renderStatus}
+                  {(promptCopyFeedback || renderStatus) && (
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {promptCopyFeedback && (
+                        <div style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500 }}>
+                          {promptCopyFeedback}
+                        </div>
+                      )}
+                      {renderStatus && (
+                        <div style={{ fontSize: 12, color: "var(--accent)" }}>
+                          {renderStatus}
+                        </div>
+                      )}
                     </div>
                   )}
 

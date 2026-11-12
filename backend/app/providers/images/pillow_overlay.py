@@ -14,15 +14,43 @@ class PillowPosterRenderer:
     }
 
     # BrandMonk Academy Brand Kit colors
-    NAVY = (22, 32, 46)      # #16202E
-    BLUE = (31, 79, 216)     # #1F4FD8
-    SUN = (242, 184, 75)     # #F2B84B
+    NAVY = (19, 38, 34)      # #132622 Deep BrandMonk Slate
+    TEAL = (10, 124, 110)    # #0A7C6E BrandMonk Primary Teal
+    BLUE = (10, 124, 110)    # #0A7C6E Accent
+    SUN = (242, 184, 75)     # #F2B84B Warm Gold Accent
     WHITE = (255, 255, 255)
-    MUTED = (180, 190, 205)
+    MUTED = (197, 209, 205)  # #C5D1CD Crisp Muted Text
 
     def __init__(self, output_dir: str | None = None):
         self.output_dir = output_dir or os.path.join(settings.media_storage_dir, "posters")
         os.makedirs(self.output_dir, exist_ok=True)
+
+    def _load_font(self, size: int, bold: bool = False) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+        candidates = (
+            [
+                "/usr/share/fonts/noto/NotoSans-Bold.ttf",
+                "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "DejaVuSans-Bold.ttf",
+            ]
+            if bold
+            else [
+                "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+                "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "DejaVuSans.ttf",
+            ]
+        )
+        for path in candidates:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, size)
+                except Exception:
+                    continue
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:
+            return ImageFont.load_default()
 
     def render(
         self,
@@ -37,9 +65,9 @@ class PillowPosterRenderer:
         img = Image.new("RGB", (width, height), color=self.NAVY)
         draw = ImageDraw.Draw(img)
 
-        # Draw decorative geometric brand accent (sun orb top-right per reference design)
-        orb_radius = int(width * 0.35)
-        orb_center = (int(width * 1.05), int(height * -0.05))
+        # Decorative geometric brand accent top-right
+        orb_radius = int(width * 0.36)
+        orb_center = (int(width * 1.02), int(height * -0.02))
         draw.ellipse(
             [
                 orb_center[0] - orb_radius,
@@ -47,55 +75,50 @@ class PillowPosterRenderer:
                 orb_center[0] + orb_radius,
                 orb_center[1] + orb_radius,
             ],
-            fill=self.BLUE,
+            fill=self.TEAL,
         )
 
-        # Accent circle
-        small_orb = int(width * 0.12)
+        # Warm gold accent circle
+        small_orb = int(width * 0.11)
         draw.ellipse(
             [
-                int(width * 0.85) - small_orb,
-                int(height * 0.15) - small_orb,
-                int(width * 0.85) + small_orb,
-                int(height * 0.15) + small_orb,
+                int(width * 0.86) - small_orb,
+                int(height * 0.14) - small_orb,
+                int(width * 0.86) + small_orb,
+                int(height * 0.14) + small_orb,
             ],
             fill=self.SUN,
         )
 
         margin_x = int(width * 0.08)
-        padding_top = int(height * 0.08)
+        padding_top = int(height * 0.07)
 
-        # Use default font or truetype if available
-        try:
-            font_badge = ImageFont.truetype("DejaVuSans-Bold.ttf", int(width * 0.035))
-            font_head = ImageFont.truetype("DejaVuSans-Bold.ttf", int(width * 0.062))
-            font_sub = ImageFont.truetype("DejaVuSans.ttf", int(width * 0.038))
-            font_cta = ImageFont.truetype("DejaVuSans-Bold.ttf", int(width * 0.036))
-        except Exception:
-            font_badge = ImageFont.load_default()
-            font_head = ImageFont.load_default()
-            font_sub = ImageFont.load_default()
-            font_cta = ImageFont.load_default()
+        font_badge = self._load_font(int(width * 0.028), bold=True)
+        font_head = self._load_font(int(width * 0.068), bold=True)
+        font_sub = self._load_font(int(width * 0.036), bold=False)
+        font_pill = self._load_font(int(width * 0.026), bold=True)
+        font_cta = self._load_font(int(width * 0.034), bold=True)
 
         # 1. Brand Tag
-        badge_text = "BrandMonk Academy"
-        badge_w = int(width * 0.42)
-        badge_h = int(height * 0.04)
+        badge_text = "BRANDMONK ACADEMY"
+        badge_bbox = draw.textbbox((0, 0), badge_text, font=font_badge)
+        badge_w = (badge_bbox[2] - badge_bbox[0]) + 44
+        badge_h = (badge_bbox[3] - badge_bbox[1]) + 26
         draw.rounded_rectangle(
             [margin_x, padding_top, margin_x + badge_w, padding_top + badge_h],
             radius=8,
             fill=self.WHITE,
         )
         draw.text(
-            (margin_x + 18, padding_top + 8),
+            (margin_x + 22, padding_top + 10),
             badge_text,
             fill=self.NAVY,
             font=font_badge,
         )
 
-        # 2. Main Headline
-        content_y = int(height * 0.58)
-        self._draw_multiline_text(
+        # 2. Main Headline (placed prominently in upper-middle focal area)
+        content_y = int(height * 0.27)
+        after_head_y = self._draw_multiline_text(
             draw=draw,
             text=headline,
             xy=(margin_x, content_y),
@@ -105,29 +128,49 @@ class PillowPosterRenderer:
             line_spacing=18,
         )
 
+        # Accent divider bar
+        divider_y = after_head_y + int(height * 0.03)
+        draw.rounded_rectangle(
+            [margin_x, divider_y, margin_x + int(width * 0.12), divider_y + 8],
+            radius=4,
+            fill=self.SUN,
+        )
+
         # 3. Subline
-        sub_y = int(height * 0.76)
-        self._draw_multiline_text(
+        sub_y = divider_y + int(height * 0.04)
+        after_sub_y = self._draw_multiline_text(
             draw=draw,
             text=subline,
             xy=(margin_x, sub_y),
             font=font_sub,
             fill=self.MUTED,
             max_width=int(width * 0.84),
-            line_spacing=12,
+            line_spacing=14,
         )
 
-        # 4. CTA Button
-        cta_y = int(height * 0.86)
-        btn_w = int(width * 0.45)
-        btn_h = int(height * 0.065)
+        # 4. Trust strip above CTA
+        trust_y = max(after_sub_y + int(height * 0.05), int(height * 0.72))
+        draw.text(
+            (margin_x, trust_y),
+            "Transparent Fees   ·   Live Agency Mentors   ·   Small Batches",
+            fill=self.SUN,
+            font=font_pill,
+        )
+
+        # 5. CTA Button
+        cta_y = int(height * 0.82)
+        cta_bbox = draw.textbbox((0, 0), cta_text, font=font_cta)
+        btn_w = max(int(width * 0.44), (cta_bbox[2] - cta_bbox[0]) + 84)
+        btn_h = int(height * 0.072)
         draw.rounded_rectangle(
             [margin_x, cta_y, margin_x + btn_w, cta_y + btn_h],
             radius=12,
-            fill=self.BLUE,
+            fill=self.TEAL,
         )
+        text_w = cta_bbox[2] - cta_bbox[0]
+        text_h = cta_bbox[3] - cta_bbox[1]
         draw.text(
-            (margin_x + 36, cta_y + int(btn_h * 0.28)),
+            (margin_x + (btn_w - text_w) // 2, cta_y + (btn_h - text_h) // 2 - 4),
             cta_text,
             fill=self.WHITE,
             font=font_cta,
@@ -170,4 +213,5 @@ class PillowPosterRenderer:
             bbox = draw.textbbox((0, 0), line, font=font)
             line_height = bbox[3] - bbox[1]
             y += line_height + line_spacing
+        return y
 

@@ -10,6 +10,13 @@ interface DetailPaneProps {
   onClose: () => void;
 }
 
+function getMetaAdLibraryUrl(ad: Ad): string {
+  if (/^\d{8,}$/.test(ad.ad_archive_id)) {
+    return `https://www.facebook.com/ads/library/?id=${ad.ad_archive_id}`;
+  }
+  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=IN&q=${encodeURIComponent(`"${ad.competitor_name}"`)}&search_type=keyword_exact_phrase&media_type=all`;
+}
+
 const ANGLES = [
   {
     name: "Outcome",
@@ -277,20 +284,47 @@ export const DetailPane: React.FC<DetailPaneProps> = ({ ad, isOpen, onClose }) =
             {/* Ad Media Display */}
             <AdPosterCard ad={ad} />
 
-            {/* Direct Link to Meta Ad Library / Media */}
-            {ad.media_url && (
-              <div style={{ display: "flex", gap: 8 }}>
+            {/* Sources & Original Ad Links */}
+            <div
+              style={{
+                background: "var(--canvas)",
+                border: "1px solid var(--line)",
+                borderRadius: 6,
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
+                Sources &amp; Ad Links
+              </span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a
-                  href={ad.media_url}
+                  href={getMetaAdLibraryUrl(ad)}
                   target="_blank"
                   rel="noreferrer"
                   className="btn"
                   style={{ fontSize: 12, padding: "5px 10px", flex: 1, textAlign: "center", textDecoration: "none" }}
                 >
-                  {ad.media_type === "video" ? "Open video creative" : "View high-res ad image"}
+                  View on Meta Ad Library ↗
                 </a>
+                {ad.media_url && (
+                  <a
+                    href={ad.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn"
+                    style={{ fontSize: 12, padding: "5px 10px", flex: 1, textAlign: "center", textDecoration: "none" }}
+                  >
+                    {ad.media_type === "video" ? "Open Meta Reel / Video ↗" : "Open Original Image ↗"}
+                  </a>
+                )}
               </div>
-            )}
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                Platforms: <b>{ad.platforms.join(", ")}</b> · Archive ID: <code style={{ fontSize: 11 }}>{ad.ad_archive_id}</code>
+              </div>
+            </div>
 
             {/* Why This Ad Is Attractive - Prominent Highlight Block */}
             <div

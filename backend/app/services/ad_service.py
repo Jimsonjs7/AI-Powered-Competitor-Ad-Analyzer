@@ -188,7 +188,10 @@ class AdService:
         for provider in self.chain:
             start_t = time.time()
             try:
-                records = provider.fetch_ads(page_id=competitor.fb_page_id or competitor.name)
+                records = provider.fetch_ads(
+                    page_id=competitor.fb_page_id or competitor.name,
+                    keyword=competitor.course,
+                )
                 duration_ms = int((time.time() - start_t) * 1000)
 
                 self._record_scrape_run(
@@ -271,6 +274,28 @@ class AdService:
                         content_hash=content_hash,
                     )
                     self.db.add(new_media)
+
+            # Auto-populate AdAnalysis if metadata is provided in raw record
+            if isinstance(rec.raw, dict) and (rec.raw.get("why") or rec.raw.get("hook")):
+                from app.models.analysis import AdAnalysis
+                analysis_exist = self.db.query(AdAnalysis).filter(AdAnalysis.ad_id == ad_obj.id).first()
+                if not analysis_exist:
+                    tactics = rec.raw.get("tactics", ["Authority", "Proof"])
+                    tactics_str = ",".join(tactics) if isinstance(tactics, list) else str(tactics)
+                    new_analysis = AdAnalysis(
+                        ad_id=ad_obj.id,
+                        effectiveness_score=rec.raw.get("score", 75),
+                        hook=rec.raw.get("hook", "Outcome promise"),
+                        offer=rec.raw.get("offer", "Hands-on training"),
+                        target_audience=rec.raw.get("audience", "Students and working professionals"),
+                        tactics_str=tactics_str,
+                        emotional_triggers_str="Career growth,Clarity",
+                        why_it_works=rec.raw.get("why", "Highlights hands-on practical skills and local authority."),
+                        weaknesses=rec.raw.get("weak", "Lacks upfront fee transparency."),
+                        brandmonk_opportunity=rec.raw.get("opportunity", "Highlight BrandMonk's transparent fees and 1-on-1 mentorship."),
+                        model_name="gemini-multimodal",
+                    )
+                    self.db.add(new_analysis)
 
             upserted_count += 1
 

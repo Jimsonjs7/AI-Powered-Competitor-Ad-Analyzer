@@ -9,6 +9,8 @@ interface CompanyAdViewProps {
   initialCompanyId?: number | null;
   onBackToWall: () => void;
   onSelectAdForPoster?: (ad: Ad) => void;
+  onRefreshAds?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const CompanyAdView: React.FC<CompanyAdViewProps> = ({
@@ -17,6 +19,8 @@ export const CompanyAdView: React.FC<CompanyAdViewProps> = ({
   initialCompanyId = null,
   onBackToWall,
   onSelectAdForPoster,
+  onRefreshAds,
+  isRefreshing = false,
 }) => {
   const [selectedCourse, setSelectedCourse] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -48,16 +52,18 @@ export const CompanyAdView: React.FC<CompanyAdViewProps> = ({
     });
   }, [competitors, selectedCourse, searchQuery]);
 
-  // Automatically select first competitor with ads if none selected
+  // Automatically select first matching competitor if none selected or filtered out
   const activeSelectedId = useMemo(() => {
-    if (selectedCompanyId !== null) return selectedCompanyId;
+    if (selectedCompanyId !== null && filteredCompetitors.some((c) => c.id === selectedCompanyId)) {
+      return selectedCompanyId;
+    }
     const firstWithAds = filteredCompetitors.find((c) => (adsByCompetitor.get(c.id)?.length || 0) > 0);
     return firstWithAds ? firstWithAds.id : filteredCompetitors[0]?.id || null;
   }, [selectedCompanyId, filteredCompetitors, adsByCompetitor]);
 
   const selectedCompany = useMemo(() => {
-    return competitors.find((c) => c.id === activeSelectedId) || null;
-  }, [competitors, activeSelectedId]);
+    return filteredCompetitors.find((c) => c.id === activeSelectedId) || null;
+  }, [filteredCompetitors, activeSelectedId]);
 
   // Ads for the active selected company, filtered by platform
   const companyAds = useMemo(() => {
@@ -318,17 +324,59 @@ export const CompanyAdView: React.FC<CompanyAdViewProps> = ({
                             )}
                           </div>
 
-                          {ad.media_url && (
+                          {/* Sources & Ad Links */}
+                          <div
+                            style={{
+                              background: "var(--canvas)",
+                              border: "1px solid var(--line)",
+                              borderRadius: 6,
+                              padding: "8px 10px",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                            }}
+                          >
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>
+                              Sources &amp; Ad Links
+                            </span>
                             <a
-                              href={ad.media_url}
+                              href={
+                                /^\d{8,}$/.test(ad.ad_archive_id)
+                                  ? `https://www.facebook.com/ads/library/?id=${ad.ad_archive_id}`
+                                  : selectedCompany?.fb_page_id && /^\d{8,}$/.test(selectedCompany.fb_page_id)
+                                  ? `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=IN&view_all_page_id=${selectedCompany.fb_page_id}&search_type=page`
+                                  : `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=IN&q=${encodeURIComponent(`"${ad.competitor_name}"`)}&search_type=keyword_exact_phrase&media_type=all`
+                              }
                               target="_blank"
                               rel="noreferrer"
                               className="btn"
                               style={{ fontSize: 12, padding: "5px 8px", textAlign: "center", textDecoration: "none" }}
                             >
-                              {ad.media_type === "video" ? "Watch video creative" : "View original ad image"}
+                              View on Meta Ad Library ↗
                             </a>
-                          )}
+                            {selectedCompany?.fb_page_id && !selectedCompany.fb_page_id.startsWith("page_") && (
+                              <a
+                                href={`https://www.facebook.com/${selectedCompany.fb_page_id}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn"
+                                style={{ fontSize: 12, padding: "5px 8px", textAlign: "center", textDecoration: "none" }}
+                              >
+                                Company Facebook Page ↗
+                              </a>
+                            )}
+                            {ad.media_url && (
+                              <a
+                                href={ad.media_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn"
+                                style={{ fontSize: 12, padding: "5px 8px", textAlign: "center", textDecoration: "none" }}
+                              >
+                                {ad.media_type === "video" ? "Open Meta Reel / Video ↗" : "View original ad image ↗"}
+                              </a>
+                            )}
+                          </div>
 
                           <button
                             className="btn pri"
@@ -476,14 +524,28 @@ export const CompanyAdView: React.FC<CompanyAdViewProps> = ({
                     padding: 40,
                     textAlign: "center",
                     color: "var(--muted)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
                     No active ads found for {selectedCompany.name}
                   </p>
-                  <p style={{ margin: "6px 0 0", fontSize: 13 }}>
-                    Click "Refresh ads" to trigger a live crawl from Meta Ad Library, or choose another institution on the left.
+                  <p style={{ margin: 0, fontSize: 13, maxWidth: 460 }}>
+                    Click below to trigger a live crawl from Meta Ad Library or synchronize active campaign records for this institution.
                   </p>
+                  {onRefreshAds && (
+                    <button
+                      className="btn pri"
+                      onClick={onRefreshAds}
+                      disabled={isRefreshing}
+                      style={{ marginTop: 6 }}
+                    >
+                      {isRefreshing ? "Scanning Meta Ad Library..." : "Sync Ads from Meta Library"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
